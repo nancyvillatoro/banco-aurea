@@ -1,7 +1,24 @@
 <?php
 require_once __DIR__ . '/../src/auth/auth.php';
 requerir_cliente_vista();
-$c = $_SESSION['cliente'];
+require_once __DIR__ . '/../src/config/db.php';
+
+// Buscamos los datos en la BD cada vez que se abre la página,
+// así el saldo siempre está actualizado (antes se leía de la sesión).
+$cn = getConexion();
+$id = (int)$_SESSION['cliente']['id'];
+$stmt = $cn->prepare("SELECT nombre, numeroCuenta, saldo, sucursal2 FROM registro WHERE id = ?");
+$stmt->bind_param("i", $id);
+$stmt->execute();
+$c = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+$cn->close();
+
+// Si la cuenta ya no existe, se manda al login
+if (!$c) {
+    header("Location: login-cliente.php");
+    exit();
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
