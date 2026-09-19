@@ -1,10 +1,7 @@
 <?php
-session_start();
-// Seguridad: Solo empleados autenticados
-if (!isset($_SESSION['nombre'])) {
-    header("Location: login-empleado.php");
-    exit();
-}
+require_once __DIR__ . '/../src/auth/auth.php';
+// Seguridad: solo empleados
+requerir_empleado_vista();
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -78,7 +75,7 @@ if (!isset($_SESSION['nombre'])) {
                 $.ajax({
                     url: '../src/operations/calcular-sueldo.php',
                     type: 'POST',
-                    data: { empleado_id: id },
+                    data: { empleado_id: id, csrf_token: <?php echo json_encode(csrf_token()); ?> },
                     success: function(response) {
                         try {
                             const data = JSON.parse(response);
@@ -96,11 +93,18 @@ if (!isset($_SESSION['nombre'])) {
                             }
                         } catch(e) {
                             console.error("Error en respuesta:", response);
+                            $('#error-sueldo').text('Respuesta inesperada del servidor.').fadeIn();
                         }
+                    },
+                    error: function(xhr) {
+                        let msg = 'No se pudo consultar la nómina.';
+                        try { msg = JSON.parse(xhr.responseText).message || msg; } catch(e) {}
+                        $('#error-sueldo').text(msg).fadeIn();
+                        $('#detalle-sueldo').hide();
                     }
                 });
             });
         });
     </script>
 </body>
-</html>
+</html>

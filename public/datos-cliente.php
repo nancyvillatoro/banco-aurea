@@ -1,9 +1,6 @@
 <?php
-session_start();
-if (!isset($_SESSION['cliente'])) {
-    header("Location: login-cliente.php");
-    exit();
-}
+require_once __DIR__ . '/../src/auth/auth.php';
+requerir_cliente_vista();
 $c = $_SESSION['cliente'];
 ?>
 <!DOCTYPE html>
@@ -22,7 +19,10 @@ $c = $_SESSION['cliente'];
             <p><strong>Saldo Actual:</strong> $<?php echo number_format($c['saldo'], 2); ?></p>
             <p><strong>Sucursal:</strong> <?php echo htmlspecialchars($c['sucursal2']); ?></p>
         </div>
-        <a href="../src/auth/logout.php" class="btn-salir">Cerrar Sesión</a>
+        <form action="../src/auth/logout.php" method="post">
+            <?php echo csrf_field(); ?>
+            <button type="submit" class="btn-salir">Cerrar Sesión</button>
+        </form>
     </div>
 </body>
-</html>
+</html>

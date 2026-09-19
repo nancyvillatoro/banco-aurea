@@ -1,3 +1,7 @@
+<?php
+require_once __DIR__ . '/../src/auth/auth.php';
+$error = $_GET['error'] ?? '';
+?>
 <!DOCTYPE HTML>
 <html lang="es">
 <head>
@@ -18,6 +22,12 @@
                                 <span>Acceso Administrativo</span>
                             </div>
                             <form action="../src/auth/login-proceso.php" method="post">
+                <?php echo csrf_field(); ?>
+                <?php if ($error === 'bloqueado'): ?>
+                    <p style="color:#b00020; text-align:center;">Demasiados intentos. Intente de nuevo en 5 minutos.</p>
+                <?php elseif ($error !== ''): ?>
+                    <p style="color:#b00020; text-align:center;">ID o contraseña incorrectos.</p>
+                <?php endif; ?>
                                 <div class="form-group">
                                     <input type="text" name="ID" class="form-control _ge_de_ol" placeholder="ID de Empleado" required>
                                 </div>
@@ -38,4 +48,4 @@
         </div>
     </section>
 </body>
-</html>
+</html>

@@ -1,10 +1,7 @@
 <?php
-session_start();
-// Seguridad: Si no es empleado, fuera.
-if (!isset($_SESSION['nombre'])) {
-    header("Location: login-empleado.php");
-    exit();
-}
+require_once __DIR__ . '/../src/auth/auth.php';
+// Seguridad: solo empleados
+requerir_empleado_vista();
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -17,8 +14,8 @@ if (!isset($_SESSION['nombre'])) {
 <body>
     <div class="container mt-5">
         <div class="form-03-main card p-4">
-            <div class="logo text-center mb-4">
-                <img src="assets/images/user.png" width="60">
+            <div class="text-center mb-4">
+                <img src="assets/images/user.png" class="logo" style="width:60px; height:60px; margin: 0 auto 10px;">
                 <h2>Consulta de Clientes</h2>
             </div>
 
@@ -39,7 +36,7 @@ if (!isset($_SESSION['nombre'])) {
                     <div class="col-md-6">
                         <p><strong>Nombre:</strong> <span id="res-nombre"></span></p>
                         <p><strong>Correo:</strong> <span id="res-correo"></span></p>
-                        <p><strong>Teléfono:</strong> <span id="res-tel"></span></p>
+                       
                     </div>
                     <div class="col-md-6 text-right">
                         <h3 class="text-success">Saldo: $<span id="res-saldo"></span></h3>
@@ -61,19 +58,24 @@ if (!isset($_SESSION['nombre'])) {
     <script>
         $(document).ready(function() {
             $('#btnBuscar').click(function() {
-                const cuenta = $('#num_cuenta').val();
-                
+                const cuenta = $('#num_cuenta').val().trim();
+
+                if (!/^\d{10}$/.test(cuenta)) {
+                    $('#error-busqueda').text('Ingrese un número de cuenta de 10 dígitos.').fadeIn();
+                    $('#resultado-busqueda').hide();
+                    return;
+                }
+
                 $.ajax({
-                    url: '../src/operations/buscar-cliente.php', // El código que te pasé anteriormente
+                    url: '../src/operations/buscar-cliente.php',
                     type: 'POST',
-                    data: { numeroCuenta: cuenta },
+                    data: { numeroCuenta: cuenta, csrf_token: <?php echo json_encode(csrf_token()); ?> },
                     success: function(response) {
                         try {
                             const data = JSON.parse(response);
                             if(data.status === "success") {
                                 $('#res-nombre').text(data.cliente.nombre);
                                 $('#res-correo').text(data.cliente.correo);
-                                $('#res-tel').text(data.cliente.telefono);
                                 $('#res-saldo').text(parseFloat(data.cliente.saldo).toLocaleString());
                                 $('#res-tipo').text(data.cliente.tipo_cuenta);
                                 $('#res-suc').text(data.cliente.sucursal2);
@@ -86,11 +88,18 @@ if (!isset($_SESSION['nombre'])) {
                             }
                         } catch(e) {
                             console.error("Error en JSON", e);
+                            $('#error-busqueda').text('Respuesta inesperada del servidor.').fadeIn();
                         }
+                    },
+                    error: function(xhr) {
+                        let msg = 'No se pudo completar la búsqueda.';
+                        try { msg = JSON.parse(xhr.responseText).message || msg; } catch(e) {}
+                        $('#error-busqueda').text(msg).fadeIn();
+                        $('#resultado-busqueda').hide();
                     }
                 });
             });
         });
     </script>
 </body>
-</html>
+</html>

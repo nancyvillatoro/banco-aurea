@@ -1,17 +1,25 @@
 <?php
+require_once '../auth/auth.php';
+header('Content-Type: application/json');
+if (!es_empleado()) {
+    http_response_code(403);
+    echo json_encode([]);
+    exit();
+}
 require_once '../config/db.php';
 $cn = getConexion();
 
-$consulta = $cn->query("SELECT id_sucursal, nom_sucursal FROM sucursal");
 $sucursales = [];
-
-while ($fila = $consulta->fetch_assoc()) {
-    $sucursales[] = $fila;
+try {
+    $consulta = $cn->query("SELECT id_sucursal, nom_sucursal FROM sucursal");
+    while ($fila = $consulta->fetch_assoc()) {
+        $sucursales[] = $fila;
+    }
+} catch (mysqli_sql_exception $e) {
+    // Sin tabla `sucursal` se devuelve lista vacía y el formulario usa "Matriz"
+    error_log("obtener-sucursales: " . $e->getMessage());
 }
 
-// REFACTORIZACIÓN: Eliminamos el armado manual de cadenas y enviamos JSON puro
-header('Content-Type: application/json');
 echo json_encode($sucursales);
 
 $cn->close();
-?>

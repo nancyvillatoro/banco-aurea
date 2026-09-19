@@ -1,51 +1,76 @@
 <?php
-session_start();
-require_once '../config/db.php';
+require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/../config/db.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    die("Acceso denegado.");
+}
+
+if (!csrf_valido()) {
+    header("Location: ../../public/index.php?error=1");
+    exit();
+}
+
 $cn = getConexion();
+$pass = $_POST['password'] ?? '';
+if (!is_string($pass)) $pass = '';
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // 1. Identificar quién intenta entrar
-    $usuario = "";
-    if (isset($_POST['ID'])) {
-        $usuario = $_POST['ID']; // Es un Empleado
-    } elseif (isset($_POST['email'])) {
-        $usuario = $_POST['email']; // Es un Cliente
-    }
-    
-    $pass = $_POST['password'] ?? '';
+if (isset($_POST['ID'])) {
+    // Login de EMPLEADO — solo busca en inicioE
+    $usuario = (string)$_POST['ID'];
 
-    // 2. BUSCAR EN LA TABLA DE EMPLEADOS (inicioE)
-    $stmtE = $cn->prepare("SELECT * FROM inicioE WHERE id_e = ? AND contraseña = ?");
-    $stmtE->bind_param("ss", $usuario, $pass);
-    $stmtE->execute();
-    $resE = $stmtE->get_result();
-
-    if ($emp = $resE->fetch_assoc()) {
-        // Si lo encuentra, creamos sesión de empleado
-        $_SESSION['nombre'] = "Administrador"; 
-        $_SESSION['rol'] = "empleado";
-        header("Location: ../../public/regisObusc.php"); // Página de éxito
+    if (login_bloqueado($usuario)) {
+        header("Location: ../../public/login-empleado.php?error=bloqueado");
         exit();
     }
 
-    // 3. BUSCAR EN LA TABLA DE CLIENTES (registro) si no fue empleado
-    $stmtC = $cn->prepare("SELECT * FROM registro WHERE correo = ? AND contraseña = ?");
-    $stmtC->bind_param("ss", $usuario, $pass);
-    $stmtC->execute();
-    $resC = $stmtC->get_result();
+    $stmtE = $cn->prepare("SELECT id_e, contraseña FROM inicioe WHERE id_e = ?");
+    $stmtE->bind_param("s", $usuario);
+    $stmtE->execute();
+    $emp = $stmtE->get_result()->fetch_assoc();
 
-    if ($user = $resC->fetch_assoc()) {
+    if ($emp && password_verify($pass, $emp['contraseña'])) {
+        login_ok($usuario);
+        session_regenerate_id(true);
+        $_SESSION['nombre'] = "Administrador";
+        $_SESSION['rol'] = "empleado";
+        $_SESSION['empleado_id'] = $emp['id_e'];
+        header("Location: ../../public/regisObusc.php");
+        exit();
+    }
+    login_fallo($usuario);
+    header("Location: ../../public/login-empleado.php?error=1");
+    exit();
+
+} elseif (isset($_POST['email'])) {
+    // Login de CLIENTE — solo busca en registro
+    $usuario = (string)$_POST['email'];
+
+    if (login_bloqueado($usuario)) {
+        header("Location: ../../public/login-cliente.php?error=bloqueado");
+        exit();
+    }
+
+    $stmtC = $cn->prepare("SELECT * FROM registro WHERE correo = ?");
+    $stmtC->bind_param("s", $usuario);
+    $stmtC->execute();
+    $user = $stmtC->get_result()->fetch_assoc();
+
+    if ($user && password_verify($pass, $user['contraseña'])) {
+        login_ok($usuario);
+        session_regenerate_id(true);
+        unset($user['contraseña']); // el hash no debe vivir en la sesión
         $_SESSION['nombre'] = $user['nombre'];
+        $_SESSION['rol'] = "cliente";
         $_SESSION['cliente'] = $user;
         header("Location: ../../public/datos-cliente.php");
         exit();
     }
-
-    // Si no coincide en ninguna tabla
-    header("Location: ../../public/index.php?error=1");
+    login_fallo($usuario);
+    header("Location: ../../public/login-cliente.php?error=1");
     exit();
-
-} else {
-    die("Acceso denegado.");
 }
-?>
+
+header("Location: ../../public/index.php?error=1");
+exit();
