@@ -17,8 +17,12 @@ $stmt->close();
 $movimientos = [];
 if ($c) {
     try {
-        $stmt = $cn->prepare("SELECT tipo, monto, es_credito, saldo_despues, motivo, fecha
-                              FROM movimientos WHERE cuenta_id = ? ORDER BY id DESC LIMIT 10");
+        // De las transferencias solo se muestran los últimos 4 dígitos de la otra cuenta
+        $stmt = $cn->prepare("SELECT m.tipo, m.monto, m.es_credito, m.saldo_despues, m.motivo, m.fecha,
+                                     CONCAT('******', RIGHT(c.numeroCuenta, 4)) AS contraparte
+                              FROM movimientos m
+                              LEFT JOIN registro c ON c.id = m.contraparte_id
+                              WHERE m.cuenta_id = ? ORDER BY m.id DESC LIMIT 10");
         $stmt->bind_param("i", $id);
         $stmt->execute();
         $movimientos = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -28,7 +32,7 @@ if ($c) {
     }
 }
 $cn->close();
-$nombres_tipo = ['apertura' => 'Apertura', 'deposito' => 'Depósito', 'retiro' => 'Retiro', 'reverso' => 'Corrección'];
+$nombres_tipo = ['apertura' => 'Apertura', 'deposito' => 'Depósito', 'retiro' => 'Retiro', 'reverso' => 'Corrección', 'transferencia' => 'Transferencia'];
 
 // Si la cuenta ya no existe, se manda al login
 if (!$c) {
@@ -74,7 +78,12 @@ if (!$c) {
                                         <?php echo $m['es_credito'] ? '+' : '-'; ?>$<?php echo number_format((float)$m['monto'], 2); ?>
                                     </td>
                                     <td>$<?php echo number_format((float)$m['saldo_despues'], 2); ?></td>
-                                    <td><?php echo esc($m['motivo']); ?></td>
+                                    <td>
+                                        <?php if ($m['contraparte']): ?>
+                                            <?php echo $m['es_credito'] ? 'De' : 'A'; ?> cuenta <?php echo esc($m['contraparte']); ?>.
+                                        <?php endif; ?>
+                                        <?php echo esc($m['motivo']); ?>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>

@@ -31,8 +31,8 @@ para la carpeta `tests/` si le pasa.
 - `src/auth/` — login, logout y `auth.php` (sesión, roles, CSRF, límite de intentos).
 - `src/operations/` — endpoints; todos exigen sesión de empleado, POST y token CSRF.
 - `src/auth/auditoria.php` — guarda en la tabla `auditoria` qué empleado hizo cada operación (se consulta en `public/auditoria-vista.php`).
-- Roles: **empleado** (registra clientes, consulta, nómina, depósitos y retiros) y **administrador** (además: auditoría, reversos y gestión de empleados).
-- `src/lib/movimientos.php` — depósitos, retiros y reversos (con transacciones). El límite por operación está en `src/config/limites.php`.
+- Roles: **empleado** (registra clientes, consulta, nómina, depósitos, retiros y transferencias) y **administrador** (además: auditoría, reversos —incluidas las transferencias— y gestión de empleados).
+- `src/lib/movimientos.php` — depósitos, retiros, transferencias y reversos (con transacciones). El límite por operación está en `src/config/limites.php`.
 - `src/config/` — conexión a la BD (`.htaccess` impide el acceso web directo).
 - `database/schema.sql` — esquema de la BD (y `migracion-*.sql` para BD anteriores).
 - `tests/` — pruebas automáticas.

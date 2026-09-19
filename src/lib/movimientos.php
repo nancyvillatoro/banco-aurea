@@ -48,7 +48,7 @@ function con_transaccion($cn, $accion) {
 }
 
 // Cambia el saldo y guarda el movimiento. Debe llamarse DENTRO de una transacción.
-function aplicar_movimiento($cn, $cuenta_id, $tipo, $es_credito, $monto, $empleado, $motivo, $reversa_de = null) {
+function aplicar_movimiento($cn, $cuenta_id, $tipo, $es_credito, $monto, $empleado, $motivo, $reversa_de = null, $ref = null, $contraparte = null) {
     // 1) Leemos el saldo y bloqueamos la fila (FOR UPDATE) para que nadie más la cambie a la vez.
     //    Las comparaciones las hace MySQL con decimales exactos.
     $stmt = $cn->prepare("SELECT COALESCE(saldo, 0) >= ? AS alcanza,
@@ -86,10 +86,11 @@ function aplicar_movimiento($cn, $cuenta_id, $tipo, $es_credito, $monto, $emplea
     // 4) Guardamos el movimiento
     $credito = $es_credito ? 1 : 0;
     $stmt = $cn->prepare("INSERT INTO movimientos
-                          (cuenta_id, tipo, monto, es_credito, saldo_despues, empleado_id, motivo, reversa_de)
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    // tipos: cuenta_id(i) tipo(s) monto(s) es_credito(i) saldo(s) empleado(s) motivo(s) reversa_de(i)
-    $stmt->bind_param("ississsi", $cuenta_id, $tipo, $monto, $credito, $saldo, $empleado, $motivo, $reversa_de);
+                          (cuenta_id, tipo, monto, es_credito, saldo_despues, empleado_id, motivo, reversa_de,
+                           transferencia_ref, contraparte_id)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    // tipos: cuenta_id(i) tipo(s) monto(s) es_credito(i) saldo(s) empleado(s) motivo(s) reversa_de(i) ref(s) contraparte(i)
+    $stmt->bind_param("ississsisi", $cuenta_id, $tipo, $monto, $credito, $saldo, $empleado, $motivo, $reversa_de, $ref, $contraparte);
     $stmt->execute();
     $movimiento_id = $cn->insert_id;
     $stmt->close();
@@ -119,7 +120,7 @@ function retirar($cn, $cuenta_id, $monto, $empleado, $motivo) {
 function reversar($cn, $movimiento_id, $empleado, $motivo) {
     return con_transaccion($cn, function () use ($cn, $movimiento_id, $empleado, $motivo) {
         // Buscamos el movimiento original y lo bloqueamos
-        $stmt = $cn->prepare("SELECT cuenta_id, tipo, monto, es_credito FROM movimientos WHERE id = ? FOR UPDATE");
+        $stmt = $cn->prepare("SELECT cuenta_id, tipo, monto, es_credito, transferencia_ref FROM movimientos WHERE id = ? FOR UPDATE");
         $stmt->bind_param("i", $movimiento_id);
         $stmt->execute();
         $orig = $stmt->get_result()->fetch_assoc();
@@ -128,9 +129,14 @@ function reversar($cn, $movimiento_id, $empleado, $motivo) {
         if (!$orig) {
             return resultado(false, 'El movimiento no existe.');
         }
-        // Solo se revierten depósitos y retiros (no aperturas ni otros reversos)
-        if (!in_array($orig['tipo'], ['deposito', 'retiro'], true)) {
+        // Solo se revierten depósitos, retiros y transferencias (no aperturas ni otros reversos)
+        if (!in_array($orig['tipo'], ['deposito', 'retiro', 'transferencia'], true)) {
             return resultado(false, 'Ese tipo de movimiento no se puede revertir.');
+        }
+
+        // Una transferencia tiene dos filas: se revierten las dos juntas
+        if ($orig['tipo'] === 'transferencia') {
+            return reversar_transferencia($cn, $orig['transferencia_ref'], $empleado, $motivo);
         }
 
         // ¿Ya tiene un reverso?
@@ -148,4 +154,94 @@ function reversar($cn, $movimiento_id, $empleado, $motivo) {
         return aplicar_movimiento($cn, (int)$orig['cuenta_id'], 'reverso', $es_credito,
                                   $orig['monto'], $empleado, $motivo, $movimiento_id);
     });
+}
+
+// Bloquea dos cuentas SIEMPRE en el mismo orden (por id). Así, si dos transferencias
+// cruzadas ocurren a la vez (A->B y B->A), no se traban entre ellas (deadlock).
+function bloquear_cuentas($cn, $id1, $id2) {
+    $menor = min($id1, $id2);
+    $mayor = max($id1, $id2);
+    $stmt = $cn->prepare("SELECT id FROM registro WHERE id IN (?, ?) ORDER BY id FOR UPDATE");
+    $stmt->bind_param("ii", $menor, $mayor);
+    $stmt->execute();
+    $cuantas = $stmt->get_result()->num_rows;
+    $stmt->close();
+    return $cuantas === 2;
+}
+
+// Mueve dinero de una cuenta a otra. Se guardan DOS movimientos con la misma referencia.
+function transferir($cn, $origen_id, $destino_id, $monto, $empleado, $motivo) {
+    if ($origen_id === $destino_id) {
+        return resultado(false, 'La cuenta de origen y la de destino deben ser distintas.');
+    }
+    if ((float)$monto > MAX_OPERACION) {
+        return resultado(false, 'El monto máximo por operación es $' . number_format(MAX_OPERACION, 2) . '.');
+    }
+    return con_transaccion($cn, function () use ($cn, $origen_id, $destino_id, $monto, $empleado, $motivo) {
+        if (!bloquear_cuentas($cn, $origen_id, $destino_id)) {
+            return resultado(false, 'Alguna de las cuentas no existe.');
+        }
+        $ref = bin2hex(random_bytes(8));
+
+        // Sale de la cuenta de origen (aquí se valida que alcance el saldo)...
+        $salida = aplicar_movimiento($cn, $origen_id, 'transferencia', false, $monto, $empleado, $motivo, null, $ref, $destino_id);
+        if (!$salida['ok']) {
+            return $salida;
+        }
+        // ...y entra a la de destino. Si esto falla, con_transaccion deshace también la salida.
+        $entrada = aplicar_movimiento($cn, $destino_id, 'transferencia', true, $monto, $empleado, $motivo, null, $ref, $origen_id);
+        if (!$entrada['ok']) {
+            return resultado(false, 'La cuenta de destino no puede recibir ese monto: ' . $entrada['mensaje']);
+        }
+        return resultado(true, 'Transferencia realizada.', [
+            'saldo' => $salida['saldo'],
+            'movimiento_id' => $salida['movimiento_id'],
+        ]);
+    });
+}
+
+// Revierte una transferencia completa (las dos filas). Debe llamarse DENTRO de una transacción.
+function reversar_transferencia($cn, $ref, $empleado, $motivo) {
+    $stmt = $cn->prepare("SELECT id, cuenta_id, monto, es_credito, contraparte_id FROM movimientos
+                          WHERE transferencia_ref = ? AND tipo = 'transferencia' ORDER BY id FOR UPDATE");
+    $stmt->bind_param("s", $ref);
+    $stmt->execute();
+    $filas = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    if (count($filas) !== 2) {
+        return resultado(false, 'La transferencia está incompleta y no se puede revertir.');
+    }
+
+    // ¿Alguna de las dos filas ya fue revertida?
+    $stmt = $cn->prepare("SELECT COUNT(*) AS n FROM movimientos WHERE reversa_de IN (?, ?)");
+    $stmt->bind_param("ii", $filas[0]['id'], $filas[1]['id']);
+    $stmt->execute();
+    $yaRevertida = (int)$stmt->get_result()->fetch_assoc()['n'] > 0;
+    $stmt->close();
+    if ($yaRevertida) {
+        return resultado(false, 'Esa transferencia ya fue revertida.');
+    }
+
+    if (!bloquear_cuentas($cn, (int)$filas[0]['cuenta_id'], (int)$filas[1]['cuenta_id'])) {
+        return resultado(false, 'Alguna de las cuentas no existe.');
+    }
+
+    // Primero la cuenta que en el reverso RESTA (la que había recibido el dinero):
+    // ahí es donde puede faltar saldo y todo se cancela.
+    usort($filas, function ($a, $b) {
+        return (int)$b['es_credito'] <=> (int)$a['es_credito'];
+    });
+
+    $nueva_ref = bin2hex(random_bytes(8));
+    $ultimo = null;
+    foreach ($filas as $f) {
+        $ultimo = aplicar_movimiento($cn, (int)$f['cuenta_id'], 'reverso', !$f['es_credito'], $f['monto'],
+                                     $empleado, $motivo, (int)$f['id'], $nueva_ref, (int)$f['contraparte_id']);
+        if (!$ultimo['ok']) {
+            return $ultimo;
+        }
+    }
+    // No se devuelve un saldo: son dos cuentas distintas
+    return resultado(true, 'Transferencia revertida.', ['movimiento_id' => $ultimo['movimiento_id']]);
 }

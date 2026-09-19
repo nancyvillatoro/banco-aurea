@@ -37,7 +37,13 @@ $res = reversar($cn, (int)$id, $_SESSION['empleado_id'] ?? '', $motivo);
 if ($res['ok']) {
     registrar_auditoria($cn, 'reverso', "Movimiento #$id revertido (nuevo movimiento #" . $res['movimiento_id'] . "). Motivo: $motivo");
     $cn->close();
-    volver('success', "Movimiento #$id revertido. Saldo actual: $" . number_format((float)$res['saldo'], 2), $cuenta);
+    $texto = "Movimiento #$id revertido.";
+    if (isset($res['saldo'])) {
+        $texto .= " Saldo actual: $" . number_format((float)$res['saldo'], 2);
+    } else {
+        $texto = "Transferencia del movimiento #$id revertida: se deshicieron las dos partes.";
+    }
+    volver('success', $texto, $cuenta);
 }
 
 registrar_auditoria($cn, 'reverso_rechazado', "Movimiento #$id: " . $res['mensaje']);

@@ -28,9 +28,11 @@ if ($cuenta !== '') {
         } else {
             // Últimos 20 movimientos; revertido_por dice si ya tiene un reverso
             $stmt = $cn->prepare("SELECT m.id, m.tipo, m.monto, m.es_credito, m.saldo_despues, m.empleado_id,
-                                         m.motivo, m.reversa_de, m.fecha, r.id AS revertido_por
+                                         m.motivo, m.reversa_de, m.fecha, r.id AS revertido_por,
+                                         c.numeroCuenta AS contraparte
                                   FROM movimientos m
                                   LEFT JOIN movimientos r ON r.reversa_de = m.id
+                                  LEFT JOIN registro c ON c.id = m.contraparte_id
                                   WHERE m.cuenta_id = ?
                                   ORDER BY m.id DESC LIMIT 20");
             $stmt->bind_param("i", $datos['id']);
@@ -47,8 +49,9 @@ if ($cuenta !== '') {
 // Tokens de un solo uso: uno para el formulario de depósito/retiro y otro para los reversos
 $token_operacion = $datos ? nuevo_token_operacion() : '';
 $token_reverso = $datos ? nuevo_token_operacion() : '';
+$token_transferencia = $datos ? nuevo_token_operacion() : '';
 
-$nombres_tipo = ['apertura' => 'Apertura', 'deposito' => 'Depósito', 'retiro' => 'Retiro', 'reverso' => 'Reverso'];
+$nombres_tipo = ['apertura' => 'Apertura', 'deposito' => 'Depósito', 'retiro' => 'Retiro', 'reverso' => 'Reverso', 'transferencia' => 'Transferencia'];
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -127,6 +130,32 @@ $nombres_tipo = ['apertura' => 'Apertura', 'deposito' => 'Depósito', 'retiro' =
                     </div>
                 </form>
 
+                <h4>Transferir a otra cuenta</h4>
+                <form action="../src/operations/registrar-transferencia.php" method="post" class="row mb-4"
+                      onsubmit="this.querySelector('button').disabled = true;">
+                    <?php echo csrf_field(); ?>
+                    <input type="hidden" name="op_token" value="<?php echo esc($token_transferencia); ?>">
+                    <input type="hidden" name="cuenta_origen" value="<?php echo esc($datos['numeroCuenta']); ?>">
+
+                    <div class="col-md-3 mb-2">
+                        <label for="cuenta_destino" class="form-label">Cuenta de destino</label>
+                        <input type="text" id="cuenta_destino" name="cuenta_destino" class="form-control" inputmode="numeric"
+                               pattern="\d{10}" maxlength="10" placeholder="10 dígitos" required>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label for="monto_t" class="form-label">Monto ($)</label>
+                        <input type="number" id="monto_t" name="monto" class="form-control" step="0.01" min="0.01"
+                               max="<?php echo MAX_OPERACION; ?>" required>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label for="motivo_t" class="form-label">Descripción (opcional)</label>
+                        <input type="text" id="motivo_t" name="motivo" class="form-control" maxlength="255">
+                    </div>
+                    <div class="col-md-2 mb-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">Transferir</button>
+                    </div>
+                </form>
+
                 <h4>Últimos movimientos</h4>
                 <?php if (count($movimientos) === 0): ?>
                     <div class="alert alert-warning text-center" role="alert">Esta cuenta todavía no tiene movimientos.</div>
@@ -160,14 +189,17 @@ $nombres_tipo = ['apertura' => 'Apertura', 'deposito' => 'Depósito', 'retiro' =
                                             <?php if ($m['reversa_de']): ?>
                                                 Reverso del #<?php echo (int)$m['reversa_de']; ?>.
                                             <?php endif; ?>
+                                            <?php if ($m['contraparte']): ?>
+                                                <?php echo $m['es_credito'] ? 'De' : 'A'; ?> cuenta <?php echo esc($m['contraparte']); ?>.
+                                            <?php endif; ?>
                                             <?php echo esc($m['motivo']); ?>
                                         </td>
                                         <td>
                                             <?php if ($m['revertido_por']): ?>
                                                 Revertido (#<?php echo (int)$m['revertido_por']; ?>)
-                                            <?php elseif (es_admin() && ($m['tipo'] === 'deposito' || $m['tipo'] === 'retiro')): ?>
+                                            <?php elseif (es_admin() && in_array($m['tipo'], ['deposito', 'retiro', 'transferencia'], true)): ?>
                                                 <form action="../src/operations/reversar-movimiento.php" method="post"
-                                                      onsubmit="if (!confirm('¿Reversar el movimiento #<?php echo (int)$m['id']; ?>?')) { return false; } this.querySelector('button').disabled = true;">
+                                                      onsubmit="if (!confirm('<?php echo $m['tipo'] === 'transferencia' ? '¿Reversar la transferencia completa (las dos cuentas)?' : '¿Reversar el movimiento #' . (int)$m['id'] . '?'; ?>')) { return false; } this.querySelector('button').disabled = true;">
                                                     <?php echo csrf_field(); ?>
                                                     <input type="hidden" name="op_token" value="<?php echo esc($token_reverso); ?>">
                                                     <input type="hidden" name="cuenta" value="<?php echo esc($datos['numeroCuenta']); ?>">

@@ -268,7 +268,7 @@ foreach (['regisObusc', 'registro-cliente-vista', 'buscar-cliente-vista', 'sueld
     igual("vista $v redirige", 302, $anon->get("public/$v.php")['codigo']);
 }
 igual('datos-cliente redirige', 302, $anon->get('public/datos-cliente.php')['codigo']);
-foreach (['buscar-cliente', 'calcular-sueldo', 'guardar-cliente', 'registrar-movimiento', 'reversar-movimiento', 'gestionar-empleado'] as $e) {
+foreach (['buscar-cliente', 'calcular-sueldo', 'guardar-cliente', 'registrar-movimiento', 'registrar-transferencia', 'reversar-movimiento', 'gestionar-empleado'] as $e) {
     igual("endpoint $e -> 403", 403, $anon->pedir('POST', "src/operations/$e.php", ['x' => 1])['codigo']);
 }
 igual('endpoint por GET -> 405', 405, $anon->get('src/operations/buscar-cliente.php')['codigo']);
@@ -477,7 +477,7 @@ comprobar('sin token rechazado', strpos($msg, 'ya se proces') !== false);
 seccion('8. Reversos');
 function reversar_web($nav, $cuenta, $id, $motivo) {
     preg_match_all('/name="op_token" value="([0-9a-f]+)"/', $nav->get("public/movimientos-vista.php?cuenta=$cuenta")['cuerpo'], $m);
-    $nav->post('src/operations/reversar-movimiento.php', ['op_token' => $m[1][1] ?? '', 'cuenta' => $cuenta, 'movimiento_id' => $id, 'motivo' => $motivo]);
+    $nav->post('src/operations/reversar-movimiento.php', ['op_token' => end($m[1]) ?: '', 'cuenta' => $cuenta, 'movimiento_id' => $id, 'motivo' => $motivo]);
     return aviso($nav->get("public/movimientos-vista.php?cuenta=$cuenta")['cuerpo']);
 }
 $idDep = (int)valor("SELECT id FROM movimientos WHERE tipo='deposito' AND monto=250.50 LIMIT 1");
@@ -512,6 +512,145 @@ $f = fila("SELECT r.saldo AS saldo, SUM(IF(m.es_credito, m.monto, -m.monto)) AS 
            FROM registro r JOIN movimientos m ON m.cuenta_id = r.id WHERE r.numeroCuenta = ? GROUP BY r.id", [$c]);
 igual('saldo = suma de movimientos', $f['saldo'], $f['suma']);
 igual('saldo = ultimo saldo registrado', $f['saldo'], $f['ultimo']);
+
+
+// ================================================================== 8c. TRANSFERENCIAS
+seccion('8c. Transferencias entre cuentas');
+function transferir_web($nav, $origen, $destino, $monto, $motivo = '', $token = null, $pagina = null) {
+    if ($token === null) {
+        preg_match_all('/name="op_token" value="([0-9a-f]+)"/', $nav->get("public/movimientos-vista.php?cuenta=" . ($pagina ?? $origen))['cuerpo'], $m);
+        $token = $m[1][1] ?? ''; // el 1o es el de deposito/retiro, el 2o el de transferencias
+    }
+    $nav->post('src/operations/registrar-transferencia.php', ['op_token' => $token, 'cuenta_origen' => $origen, 'cuenta_destino' => $destino, 'monto' => $monto, 'motivo' => $motivo]);
+    return aviso($nav->get("public/movimientos-vista.php?cuenta=$origen")['cuerpo']);
+}
+$hCli = password_hash('Cliente-123', PASSWORD_DEFAULT);
+$insT = bd()->prepare("INSERT INTO registro (nombre, correo, contraseña, numeroCuenta, tipo_cuenta, saldo, fecha, sucursal2) VALUES (?, ?, ?, ?, 'Ahorro', ?, CURDATE(), 'Matriz')");
+foreach ([['Dora Cuatro', 'dora@test.com', '4444444444', '1000'], ['Elio Cinco', 'elio@test.com', '5555555555', '500']] as [$n, $co, $ct, $sl]) {
+    $insT->bind_param('sssss', $n, $co, $hCli, $ct, $sl);
+    $insT->execute();
+}
+$D = '4444444444';
+$E = '5555555555';
+function total_DE() {
+    return valor("SELECT SUM(saldo) FROM registro WHERE numeroCuenta IN ('4444444444', '5555555555')");
+}
+igual('dinero total al empezar', '1500.00', total_DE());
+
+$msg = transferir_web($emp, $D, $E, '200', 'pago de renta');
+comprobar('transferencia valida', strpos($msg, 'realizada') !== false, $msg);
+igual('sale de la cuenta de origen', '800.00', saldo($D));
+igual('entra a la cuenta de destino', '700.00', saldo($E));
+igual('el dinero total se conserva', '1500.00', total_DE());
+igual('se guardan 2 movimientos con la misma referencia', '2/1', valor("SELECT CONCAT(COUNT(*), '/', COUNT(DISTINCT transferencia_ref)) FROM movimientos WHERE tipo='transferencia'"));
+igual('una fila resta y la otra suma', '0,1', valor("SELECT GROUP_CONCAT(es_credito ORDER BY id) FROM movimientos WHERE tipo='transferencia'"));
+igual('la fila de salida apunta a la cuenta de destino', $E, valor("SELECT r.numeroCuenta FROM movimientos m JOIN registro r ON r.id = m.contraparte_id WHERE m.tipo='transferencia' AND m.es_credito = 0"));
+comprobar('el historial de origen dice "A cuenta"', strpos($emp->get("public/movimientos-vista.php?cuenta=$D")['cuerpo'], 'A cuenta 5555555555') !== false);
+comprobar('el historial de destino dice "De cuenta"', strpos($emp->get("public/movimientos-vista.php?cuenta=$E")['cuerpo'], 'De cuenta 4444444444') !== false);
+
+$antes = (int)valor("SELECT COUNT(*) FROM movimientos");
+$casos = [
+    [$D, $D, '10', 'distintas', 'misma cuenta de origen y destino'],
+    [$D, '9090909090', '10', 'no existe', 'destino inexistente'],
+    ['9090909090', $E, '10', 'no existe', 'origen inexistente'],
+    [$D, 'abc', '10', '10 d', 'destino con formato invalido'],
+    [$D, $E, '5000', 'insuficiente', 'mas que el saldo'],
+    [$D, $E, '800.01', 'insuficiente', 'un centavo de mas'],
+    [$D, $E, '50000.01', 'ximo', 'sobre el limite'],
+    [$D, $E, '-5', 'monto debe', 'monto negativo'],
+    [$D, $E, '0', 'monto debe', 'monto cero'],
+    [$D, $E, 'abc', 'monto debe', 'monto texto'],
+    [$D, $E, '1.234', 'monto debe', 'tres decimales'],
+];
+foreach ($casos as [$o, $d, $m, $esperado, $desc]) {
+    // si el origen no existe, el token se saca de la pagina de una cuenta valida
+    $msg = transferir_web($emp, $o, $d, $m, '', null, $o === '9090909090' ? $D : null);
+    comprobar("rechazada: $desc", strpos($msg, $esperado) !== false, $msg);
+}
+igual('los saldos no cambiaron con los rechazos', '800.00/700.00', saldo($D) . '/' . saldo($E));
+igual('no se guardo ningun movimiento', $antes, (int)valor("SELECT COUNT(*) FROM movimientos"));
+
+preg_match_all('/name="op_token" value="([0-9a-f]+)"/', $emp->get("public/movimientos-vista.php?cuenta=$D")['cuerpo'], $m);
+$tokT = $m[1][1];
+$antes = (int)valor("SELECT COUNT(*) FROM movimientos");
+foreach ([1, 2, 3] as $i) {
+    $msg_rep = transferir_web($emp, $D, $E, '10', '', $tokT);
+}
+igual('3 envios del mismo formulario = 1 transferencia (2 filas)', $antes + 2, (int)valor("SELECT COUNT(*) FROM movimientos"));
+comprobar('mensaje de operacion repetida', strpos($msg_rep, 'ya se proces') !== false, $msg_rep);
+igual('saldos tras la transferencia de 10', '790.00/710.00', saldo($D) . '/' . saldo($E));
+
+bd()->query("UPDATE registro SET saldo = 99999990.00 WHERE numeroCuenta = '$E'");
+$antes = (int)valor("SELECT COUNT(*) FROM movimientos");
+$msg = transferir_web($emp, $D, $E, '20');
+comprobar('si el destino no puede recibir, se rechaza', strpos($msg, 'destino') !== false, $msg);
+igual('atomicidad: el origen NO perdio dinero', '790.00', saldo($D));
+igual('atomicidad: el destino no cambio', '99999990.00', saldo($E));
+igual('atomicidad: no quedo ninguna fila a medias', $antes, (int)valor("SELECT COUNT(*) FROM movimientos"));
+bd()->query("UPDATE registro SET saldo = 710.00 WHERE numeroCuenta = '$E'");
+
+$dora = new Nav();
+$dora->loginCliente('dora@test.com', 'Cliente-123');
+$h = $dora->get('public/datos-cliente.php')['cuerpo'];
+comprobar('el cliente ve la transferencia', strpos($h, 'Transferencia') !== false);
+comprobar('ve la otra cuenta enmascarada (******5555)', strpos($h, '******5555') !== false);
+comprobar('NO ve el numero completo de la otra cuenta', strpos($h, '5555555555') === false);
+
+seccion('8d. Reverso de transferencias');
+$idT = (int)valor("SELECT MIN(id) FROM movimientos WHERE tipo='transferencia'");
+$refT = valor("SELECT transferencia_ref FROM movimientos WHERE id = ?", [$idT]);
+$idT2 = (int)valor("SELECT id FROM movimientos WHERE transferencia_ref = ? AND id <> ?", [$refT, $idT]);
+$vista = $admin->get("public/movimientos-vista.php?cuenta=$D")['cuerpo'];
+comprobar('el administrador ve el boton para revertir la transferencia', strpos($vista, 'la transferencia completa') !== false);
+igual('un empleado normal no puede revertirla (403)', 403, $emp->post('src/operations/reversar-movimiento.php', ['movimiento_id' => $idT, 'motivo' => 'intento de empleado', 'op_token' => 'x'])['codigo']);
+$msg = reversar_web($admin, $D, $idT, 'transferencia por error');
+comprobar('el administrador revierte la transferencia', strpos($msg, 'revertida') !== false, $msg);
+igual('vuelve el dinero a cada cuenta', '990.00/510.00', saldo($D) . '/' . saldo($E));
+igual('el dinero total se conserva tras el reverso', '1500.00', total_DE());
+igual('se crean 2 reversos ligados a la transferencia original', 2, (int)valor("SELECT COUNT(*) FROM movimientos WHERE tipo='reverso' AND transferencia_ref IS NOT NULL"));
+comprobar('no se revierte dos veces (por la misma fila)', strpos(reversar_web($admin, $D, $idT, 'otra vez lo mismo'), 'ya fue revertida') !== false);
+comprobar('ni por la otra fila de la transferencia', strpos(reversar_web($admin, $E, $idT2, 'por la otra fila'), 'ya fue revertida') !== false);
+igual('sigue todo igual tras los intentos repetidos', '990.00/510.00', saldo($D) . '/' . saldo($E));
+
+transferir_web($emp, $D, $E, '300');
+igual('nueva transferencia de 300', '690.00/810.00', saldo($D) . '/' . saldo($E));
+mover($emp, $E, 'retiro', '810');
+igual('el destino gasta todo su saldo', '0.00', saldo($E));
+$idT3 = (int)valor("SELECT MAX(id) FROM movimientos WHERE tipo='transferencia' AND es_credito = 0");
+$reversos_antes = (int)valor("SELECT COUNT(*) FROM movimientos WHERE tipo='reverso'");
+$msg = reversar_web($admin, $D, $idT3, 'el destino ya no tiene fondos');
+comprobar('no se puede revertir si el destino ya no tiene el dinero', strpos($msg, 'insuficiente') !== false, $msg);
+igual('reverso fallido: ninguna cuenta cambio', '690.00/0.00', saldo($D) . '/' . saldo($E));
+igual('reverso fallido: no quedaron reversos a medias', $reversos_antes, (int)valor("SELECT COUNT(*) FROM movimientos WHERE tipo='reverso'"));
+
+seccion('8e. Transferencias cruzadas simultaneas');
+bd()->query("UPDATE registro SET saldo = 1000 WHERE numeroCuenta = '$D'");
+bd()->query("UPDATE registro SET saldo = 500 WHERE numeroCuenta = '$E'");
+$idD = (int)valor("SELECT id FROM registro WHERE numeroCuenta = ?", [$D]);
+$idE = (int)valor("SELECT id FROM registro WHERE numeroCuenta = ?", [$E]);
+$procs = [];
+$tuberias = [];
+for ($i = 0; $i < 8; $i++) {
+    [$o, $d] = $i % 2 === 0 ? [$idD, $idE] : [$idE, $idD]; // la mitad D->E y la otra mitad E->D
+    $procs[] = proc_open([PHP_BINARY, __DIR__ . '/transferencia-paralela.php', (string)$o, (string)$d, '10'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+    $tuberias[] = $pipes;
+}
+$oks = $rech = $errs = 0;
+foreach ($procs as $i => $p) {
+    $out = trim(stream_get_contents($tuberias[$i][1]));
+    proc_close($p);
+    if (preg_match('/ok=(\d+) rechazadas=(\d+) errores=(\d+)/', $out, $mm)) {
+        $oks += (int)$mm[1];
+        $rech += (int)$mm[2];
+        $errs += (int)$mm[3];
+    }
+}
+igual('80 transferencias cruzadas: ninguna termino en error (sin deadlocks)', 0, $errs);
+igual('...todas se procesaron (ok + rechazadas)', 80, $oks + $rech);
+igual('el dinero total se conserva', '1500.00', total_DE());
+igual('cada cuenta cuadra con su ultimo saldo registrado (D)', saldo($D), valor("SELECT saldo_despues FROM movimientos WHERE cuenta_id = ? ORDER BY id DESC LIMIT 1", [$idD]));
+igual('cada cuenta cuadra con su ultimo saldo registrado (E)', saldo($E), valor("SELECT saldo_despues FROM movimientos WHERE cuenta_id = ? ORDER BY id DESC LIMIT 1", [$idE]));
+igual('cada transferencia exitosa dejo 2 filas', $oks * 2, (int)valor("SELECT COUNT(*) FROM movimientos WHERE tipo='transferencia' AND id > ?", [$idT3 + 1]));
 
 // ================================================================== 9. CONCURRENCIA Y ROLLBACK
 seccion('9. Retiros simultaneos y rollback');
@@ -585,7 +724,7 @@ $saldo_antes = saldo($c);
 foreach (['regisObusc', 'movimientos-vista', 'clientes-vista', 'auditoria-vista', 'empleados-vista', 'buscar-cliente-vista', 'registro-cliente-vista'] as $v) {
     igual("cliente no entra a $v", 302, $cli->get("public/$v.php")['codigo']);
 }
-foreach (['registrar-movimiento', 'reversar-movimiento', 'gestionar-empleado', 'guardar-cliente', 'buscar-cliente'] as $e) {
+foreach (['registrar-movimiento', 'registrar-transferencia', 'reversar-movimiento', 'gestionar-empleado', 'guardar-cliente', 'buscar-cliente'] as $e) {
     igual("cliente no puede usar $e", 403, $cli->post("src/operations/$e.php", ['cuenta' => $c, 'tipo' => 'deposito', 'monto' => '999'])['codigo']);
 }
 igual('el saldo de Ana no cambio por los intentos del cliente', $saldo_antes, saldo($c));
@@ -602,7 +741,7 @@ igual('el empleado tambien cierra sesion', 302, $emp->get('public/regisObusc.php
 
 // ================================================================== 12. AUDITORÍA
 seccion('12. Auditoria');
-foreach (['login', 'login_fallido', 'logout', 'registrar_cliente', 'consultar_cuenta', 'listar_clientes', 'consultar_movimientos', 'deposito', 'retiro', 'reverso', 'crear_empleado', 'cambiar_clave_empleado', 'desactivar_empleado', 'activar_empleado', 'cambiar_rol_empleado'] as $a) {
+foreach (['login', 'login_fallido', 'logout', 'registrar_cliente', 'consultar_cuenta', 'listar_clientes', 'consultar_movimientos', 'deposito', 'retiro', 'reverso', 'transferencia', 'transferencia_rechazada', 'crear_empleado', 'cambiar_clave_empleado', 'desactivar_empleado', 'activar_empleado', 'cambiar_rol_empleado'] as $a) {
     comprobar("se registra '$a'", (int)valor("SELECT COUNT(*) FROM auditoria WHERE accion = ?", [$a]) >= 1);
 }
 igual('ninguna contrasena en la auditoria', 0, valor("SELECT COUNT(*) FROM auditoria WHERE detalle LIKE '%Clave-%' OR detalle LIKE '%Cliente-123%' OR detalle LIKE '%Admin-Clave%'"));
