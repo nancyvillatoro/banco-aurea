@@ -118,6 +118,20 @@ tests/                Pruebas automáticas
 docs/                 Decisiones técnicas
 ```
 
+## Origen y alcance
+
+Banco Áurea empezó como un proyecto en equipo. La **base** (inicio de sesión de clientes y empleados, registro y consulta
+de clientes, consulta de nómina y la primera versión de la interfaz) la desarrolló el equipo original, y es el primer
+commit de este repositorio.
+
+Todo lo que aparece después en el historial se agregó sobre esa base:
+
+- Seguridad: endpoints protegidos, roles, CSRF, sesiones seguras y bloqueo por intentos.
+- Dinero: depósitos, retiros, transferencias y reversos con transacciones y control de concurrencia.
+- Auditoría, gestión de empleados con rol de administrador, listado y búsqueda de clientes.
+- Historial paginado, cambio de contraseña del cliente, páginas de error y datos de demostración.
+- 327 pruebas automáticas de extremo a extremo y la documentación de decisiones técnicas.
+
 ## Límites conocidos
 
 Es un proyecto académico pensado para ejecutarse en local, **no está listo para producción**:
