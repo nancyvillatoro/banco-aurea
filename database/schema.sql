@@ -2,6 +2,9 @@
 -- Uso:  mysql -u root -p < database/schema.sql
 -- Es idempotente: se puede ejecutar sobre una BD existente sin borrar datos.
 
+-- Necesario: sin esto, en consolas de Windows la columna `contraseña` se crea con el nombre corrupto.
+SET NAMES utf8mb4;
+
 CREATE DATABASE IF NOT EXISTS banco CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 USE banco;
 
