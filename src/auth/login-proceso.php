@@ -26,23 +26,26 @@ if (isset($_POST['ID'])) {
         exit();
     }
 
-    $stmtE = $cn->prepare("SELECT id_e, contraseña FROM inicioe WHERE id_e = ?");
+    $stmtE = $cn->prepare("SELECT id_e, contraseña, nombre, rol, activo FROM inicioe WHERE id_e = ?");
     $stmtE->bind_param("s", $usuario);
     $stmtE->execute();
     $emp = $stmtE->get_result()->fetch_assoc();
 
-    if ($emp && password_verify($pass, $emp['contraseña'])) {
+    // Un empleado dado de baja (activo = 0) no puede entrar aunque la contraseña sea correcta
+    if ($emp && $emp['activo'] && password_verify($pass, $emp['contraseña'])) {
         login_ok($usuario);
         session_regenerate_id(true);
-        $_SESSION['nombre'] = "Administrador";
-        $_SESSION['rol'] = "empleado";
+        $_SESSION['nombre'] = $emp['nombre'] !== '' ? $emp['nombre'] : $emp['id_e'];
+        $_SESSION['rol'] = "empleado";          // tipo de usuario
+        $_SESSION['nivel'] = $emp['rol'];       // empleado o administrador
         $_SESSION['empleado_id'] = $emp['id_e'];
         registrar_auditoria($cn, 'login');
         header("Location: ../../public/regisObusc.php");
         exit();
     }
     login_fallo($usuario);
-    registrar_auditoria($cn, 'login_fallido', 'ID intentado: ' . $usuario, mb_substr($usuario, 0, 50));
+    $detalle = 'ID intentado: ' . $usuario . ($emp && !$emp['activo'] ? ' (cuenta desactivada)' : '');
+    registrar_auditoria($cn, 'login_fallido', $detalle, mb_substr($usuario, 0, 50));
     header("Location: ../../public/login-empleado.php?error=1");
     exit();
 

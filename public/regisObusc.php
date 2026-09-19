@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../src/auth/auth.php';
 // Seguridad: solo empleados
 requerir_empleado_vista();
+$flash = flash_get();
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -18,7 +19,14 @@ requerir_empleado_vista();
             <div class="text-center mb-4">
                 <h1>Bienvenid@, <?php echo esc($_SESSION['nombre']); ?></h1>
                 <p class="text-muted">¿Qué operación desea realizar hoy?</p>
+                <p class="text-muted"><small>Rol: <?php echo es_admin() ? 'Administrador' : 'Empleado'; ?></small></p>
             </div>
+
+            <?php if ($flash): ?>
+                <div class="alert alert-<?php echo $flash['tipo'] === 'success' ? 'success' : 'danger'; ?>" role="alert">
+                    <?php echo esc($flash['mensaje']); ?>
+                </div>
+            <?php endif; ?>
             
             <div class="row text-center">
                 <div class="col-md-6 col-lg-4 mb-3">
@@ -57,6 +65,7 @@ requerir_empleado_vista();
                     </div>
                 </div>
 
+                <?php if (es_admin()): ?>
                 <div class="col-md-6 col-lg-4 mb-3">
                     <div class="p-4 border rounded bg-white h-100">
                         <div style="font-size: 3rem;" aria-hidden="true">🕵️</div>
@@ -65,6 +74,16 @@ requerir_empleado_vista();
                         <a href="auditoria-vista.php" class="btn btn-dark btn-lg btn-block">Ver Auditoría</a>
                     </div>
                 </div>
+
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="p-4 border rounded bg-white h-100">
+                        <div style="font-size: 3rem;" aria-hidden="true">👥</div>
+                        <h3>Empleados</h3>
+                        <p>Crear empleados, cambiar contraseñas y darlos de baja.</p>
+                        <a href="empleados-vista.php" class="btn btn-danger btn-lg btn-block">Ir a Empleados</a>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <div class="col-md-6 col-lg-4 mb-3">
                     <div class="p-4 border rounded bg-white h-100">

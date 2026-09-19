@@ -31,14 +31,66 @@ function es_empleado(): bool {
     return ($_SESSION['rol'] ?? '') === 'empleado';
 }
 
+function es_admin(): bool {
+    return es_empleado() && ($_SESSION['nivel'] ?? '') === 'administrador';
+}
+
+// Confirma en la BD que el empleado sigue activo y toma su rol ACTUAL.
+// Así, si un administrador lo da de baja o le cambia el rol, se nota en la siguiente página
+// (sin esperar a que cierre sesión).
+function empleado_vigente(): bool {
+    if (!es_empleado()) {
+        return false;
+    }
+    static $resultado = null; // se consulta una sola vez por petición
+    if ($resultado !== null) {
+        return $resultado;
+    }
+
+    require_once __DIR__ . '/../config/db.php';
+    try {
+        $cn = getConexion();
+        $id = (string)($_SESSION['empleado_id'] ?? '');
+        $stmt = $cn->prepare("SELECT rol, activo, nombre FROM inicioe WHERE id_e = ?");
+        $stmt->bind_param("s", $id);
+        $stmt->execute();
+        $fila = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        $cn->close();
+    } catch (Throwable $e) {
+        error_log("empleado_vigente: " . $e->getMessage());
+        return $resultado = false; // ante la duda, no se deja pasar
+    }
+
+    if (!$fila || !$fila['activo']) {
+        session_unset(); // ya no es un empleado válido: se cierra su sesión
+        return $resultado = false;
+    }
+    $_SESSION['nivel'] = $fila['rol'];
+    if ($fila['nombre'] !== '') {
+        $_SESSION['nombre'] = $fila['nombre'];
+    }
+    return $resultado = true;
+}
+
 function es_cliente(): bool {
     return ($_SESSION['rol'] ?? '') === 'cliente' && isset($_SESSION['cliente']);
 }
 
 // Para vistas (páginas): redirige al login si no hay sesión del rol adecuado
 function requerir_empleado_vista(): void {
-    if (!es_empleado()) {
+    if (!empleado_vigente()) {
         header('Location: login-empleado.php');
+        exit();
+    }
+}
+
+// Páginas solo para el administrador; un empleado normal vuelve al panel con un aviso
+function requerir_admin_vista(): void {
+    requerir_empleado_vista();
+    if (!es_admin()) {
+        flash_set('danger', 'No tiene permiso para entrar a esa sección.');
+        header('Location: regisObusc.php');
         exit();
     }
 }
@@ -55,11 +107,19 @@ function requerir_empleado_api(): void {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         responder_error(405, 'Método no permitido.');
     }
-    if (!es_empleado()) {
+    if (!empleado_vigente()) {
         responder_error(403, 'No autorizado.');
     }
     if (!csrf_valido()) {
         responder_error(403, 'Token de seguridad inválido. Recargue la página.');
+    }
+}
+
+// Endpoints solo para el administrador
+function requerir_admin_api(): void {
+    requerir_empleado_api();
+    if (!es_admin()) {
+        responder_error(403, 'Solo el administrador puede hacer esto.');
     }
 }
 

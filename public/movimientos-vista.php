@@ -165,7 +165,7 @@ $nombres_tipo = ['apertura' => 'Apertura', 'deposito' => 'Depósito', 'retiro' =
                                         <td>
                                             <?php if ($m['revertido_por']): ?>
                                                 Revertido (#<?php echo (int)$m['revertido_por']; ?>)
-                                            <?php elseif ($m['tipo'] === 'deposito' || $m['tipo'] === 'retiro'): ?>
+                                            <?php elseif (es_admin() && ($m['tipo'] === 'deposito' || $m['tipo'] === 'retiro')): ?>
                                                 <form action="../src/operations/reversar-movimiento.php" method="post"
                                                       onsubmit="if (!confirm('¿Reversar el movimiento #<?php echo (int)$m['id']; ?>?')) { return false; } this.querySelector('button').disabled = true;">
                                                     <?php echo csrf_field(); ?>

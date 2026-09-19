@@ -1,6 +1,6 @@
 <?php
 require_once '../auth/auth.php';
-requerir_empleado_api();
+requerir_admin_api(); // solo el administrador corrige movimientos
 require_once '../config/db.php';
 require_once '../auth/auditoria.php';
 require_once '../lib/movimientos.php';

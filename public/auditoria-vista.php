@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../src/auth/auth.php';
-requerir_empleado_vista();
+requerir_admin_vista(); // solo el administrador ve la auditoría
 require_once __DIR__ . '/../src/config/db.php';
 
 $cn = getConexion();

@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS inicioe (
   id           INT(11)      NOT NULL AUTO_INCREMENT,
   id_e         VARCHAR(50)  NOT NULL,
   `contraseña` VARCHAR(255) NOT NULL,            -- hash de password_hash()
+  nombre       VARCHAR(100) NOT NULL DEFAULT '',
+  rol          ENUM('empleado','administrador') NOT NULL DEFAULT 'empleado',
+  activo       TINYINT(1)   NOT NULL DEFAULT 1,  -- 0 = dado de baja: ya no puede entrar
   PRIMARY KEY (id),
   UNIQUE KEY id_e (id_e)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -86,5 +89,6 @@ CREATE TABLE IF NOT EXISTS movimientos (
   CONSTRAINT fk_mov_reversa FOREIGN KEY (reversa_de) REFERENCES movimientos (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Crear un empleado (generar el hash con:  php -r "echo password_hash('TuClave', PASSWORD_DEFAULT);" )
--- INSERT INTO inicioe (id_e, `contraseña`) VALUES ('admin', '<hash>');
+-- Crear el PRIMER administrador (generar el hash con:  php -r "echo password_hash('TuClave', PASSWORD_DEFAULT);" )
+-- INSERT INTO inicioe (id_e, `contraseña`, nombre, rol) VALUES ('admin', '<hash>', 'Administrador', 'administrador');
+-- Los demás empleados se crean desde la pantalla "Empleados" del administrador.

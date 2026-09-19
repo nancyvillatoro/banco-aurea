@@ -1,7 +1,7 @@
 <?php
 require_once '../auth/auth.php';
 header('Content-Type: application/json');
-if (!es_empleado()) {
+if (!empleado_vigente()) {
     http_response_code(403);
     echo json_encode([]);
     exit();
