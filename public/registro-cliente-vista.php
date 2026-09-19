@@ -12,6 +12,7 @@ $v = fn($campo) => esc($old[$campo] ?? '');
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Banco Áurea - Registro de Cliente</title>
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
     <link href="assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="assets/css/style.css" rel="stylesheet">
 </head>

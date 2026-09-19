@@ -21,8 +21,8 @@ Capturas de pantalla (agregar en docs/capturas/ y quitar este comentario):
 
 | Rol | Puede |
 |---|---|
-| **Cliente** | Ver su saldo actualizado y sus últimos 10 movimientos (de las transferencias solo ve los últimos 4 dígitos de la otra cuenta). |
-| **Empleado** | Registrar clientes, buscar cuentas, listar clientes con búsqueda y paginación, consultar nómina, hacer depósitos, retiros y transferencias, y ver el historial de una cuenta. |
+| **Cliente** | Ver su saldo actualizado y todos sus movimientos, paginados (de las transferencias solo ve los últimos 4 dígitos de la otra cuenta), y **cambiar su contraseña**. |
+| **Empleado** | Registrar clientes, buscar cuentas, listar clientes con búsqueda y paginación, consultar nómina, hacer depósitos, retiros y transferencias, y ver el historial paginado de una cuenta. |
 | **Administrador** | Todo lo del empleado, más: **revertir movimientos** (incluidas transferencias completas), ver la **auditoría** y **gestionar empleados** (crear, cambiar contraseña y rol, activar o desactivar). |
 
 ## Probarlo en 5 minutos
@@ -83,7 +83,8 @@ Sentencias preparadas en todas las consultas con datos del usuario · contraseñ
 token CSRF en todos los formularios y endpoints · sesión regenerada al iniciar sesión, cookie `HttpOnly` y
 `SameSite`, expiración a los 30 minutos de inactividad · bloqueo temporal tras 5 intentos fallidos de login ·
 escape de toda salida HTML · endpoints que solo aceptan POST y responden 403 sin sesión o sin permiso · cabeceras de
-seguridad y bloqueo de acceso directo a `src/config`, `src/lib`, `database` y `tests` mediante `.htaccess`.
+seguridad, páginas de error propias (403, 404 y 500) y bloqueo de acceso directo a `src/config`, `src/lib`,
+`database` y `tests` mediante `.htaccess`.
 
 ## Pruebas automáticas
 
@@ -91,15 +92,15 @@ seguridad y bloqueo de acceso directo a `src/config`, `src/lib`, `database` y `t
 C:\xampp\php\php.exe tests\run-tests.php
 ```
 
-**271 comprobaciones de extremo a extremo.** El script crea una base temporal `banco_test` desde
+**327 comprobaciones de extremo a extremo.** El script crea una base temporal `banco_test` desde
 `database/schema.sql`, levanta un servidor PHP propio en el puerto 8081, recorre la aplicación con peticiones HTTP
 reales y al terminar borra la base y apaga el servidor. **No toca la base de datos real** (aborta si la base
 configurada no es `banco_test`). Termina con código 0 si todo pasó.
 
 Cubre: login y bloqueo por intentos, roles y permisos, registro con validaciones, búsquedas, depósitos, retiros y
 transferencias (montos inválidos, límites, doble envío), reversos, retiros y transferencias simultáneas, rollback,
-gestión de empleados con la sesión abierta, vista del cliente, logout, auditoría y los propios datos de demostración
-(incluye que las credenciales documentadas funcionan).
+gestión de empleados con la sesión abierta, vista del cliente, paginación del historial, cambio de contraseña, páginas
+de error, logout, auditoría y los propios datos de demostración (incluye que las credenciales documentadas funcionan).
 
 Necesita MySQL encendido. Algunos antivirus bloquean estos archivos (levantan un servidor y terminan procesos):
 agregue una excepción para la carpeta `tests/` si le pasa.
@@ -124,9 +125,10 @@ Es un proyecto académico pensado para ejecutarse en local, **no está listo par
 - Funciona por HTTP (sin HTTPS) y por defecto usa el usuario `root` de MySQL sin contraseña.
 - La política de contenido (CSP) permite scripts dentro del HTML (`'unsafe-inline'`).
 - Usa Bootstrap 5.0.0-alpha1 (una versión preliminar).
-- Los clientes no pueden cambiar ni recuperar su contraseña, ni hacer operaciones por sí mismos: solo consultan.
-- El historial muestra solo los últimos 20 movimientos, sin filtros ni exportación.
+- Los clientes pueden cambiar su contraseña pero no recuperarla si la olvidan, ni hacer operaciones por sí mismos: solo consultan.
+- El historial está paginado pero no tiene filtros por fecha ni exportación.
 - No hay pantalla para cargar la nómina (solo consulta) ni para gestionar sucursales; la sucursal se guarda por nombre.
 - No hay comisiones, intereses ni varias monedas.
 - Cambiar la contraseña de un empleado no cierra sus sesiones ya abiertas (desactivarlo sí).
+- Las páginas de error usan la ruta `/bancoAurea/public/error.php` en el `.htaccess`: si el proyecto está en otra carpeta, hay que ajustarla.
 - Las pruebas no cubren la apariencia en el navegador ni la expiración de sesión.

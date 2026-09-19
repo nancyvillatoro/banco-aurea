@@ -1,6 +1,12 @@
 # No mostrar el listado de archivos de las carpetas
 Options -Indexes
 
+# Páginas de error propias (403, 404 y 500).
+# La ruta empieza en la raíz del sitio: si el proyecto no está en /bancoAurea, ajústela.
+ErrorDocument 403 /bancoAurea/public/error.php
+ErrorDocument 404 /bancoAurea/public/error.php
+ErrorDocument 500 /bancoAurea/public/error.php
+
 # Cabeceras de seguridad (requieren mod_headers)
 <IfModule mod_headers.c>
     # Evita que la página se abra dentro de un iframe de otro sitio (clickjacking)

@@ -716,7 +716,7 @@ comprobar('clave incorrecta', strpos($cli->loginCliente('ana@test.com', 'mala')[
 comprobar('clave correcta entra a "Mi cuenta"', strpos($cli->loginCliente('ana@test.com', 'Cliente-123')['ubicacion'], 'datos-cliente') !== false);
 $h = $cli->get('public/datos-cliente.php')['cuerpo'];
 comprobar('ve su saldo actualizado', strpos($h, number_format((float)saldo($c), 2)) !== false);
-comprobar('ve sus movimientos', strpos($h, 'Ultimos movimientos') !== false || strpos($h, 'movimientos') !== false);
+comprobar('ve sus movimientos', strpos($h, '>Movimientos</h3>') !== false && strpos($h, '<td>Depósito</td>') !== false);
 comprobar('ve "Correccion" en los reversos', strpos($h, 'Corrección') !== false);
 comprobar('no ve empleados ni botones de reverso', stripos($h, 'adm_test') === false && strpos($h, 'Reversar') === false);
 comprobar('el hash de la clave no aparece', strpos($h, '$2y$') === false);
@@ -824,6 +824,120 @@ try {
 }
 comprobar('cargar la demo por segunda vez falla en vez de duplicar', $fallo_esperado);
 igual('...y no se duplico ningun movimiento', $antes, (int)valor("SELECT COUNT(*) FROM movimientos"));
+
+// ================================================================== 14. PAGINACIÓN DEL HISTORIAL
+seccion('14. Paginacion del historial');
+$hPablo = password_hash('Cliente-123', PASSWORD_DEFAULT);
+$insP = bd()->prepare("INSERT INTO registro (nombre, correo, contraseña, numeroCuenta, tipo_cuenta, saldo, fecha, sucursal2) VALUES ('Pablo Seis', 'pablo@test.com', ?, '6666666666', 'Ahorro', 0, CURDATE(), 'Matriz')");
+$insP->bind_param('s', $hPablo);
+$insP->execute();
+$idPablo = (int)valor("SELECT id FROM registro WHERE numeroCuenta = '6666666666'");
+$cnP = getConexion();
+for ($i = 1; $i <= 45; $i++) {
+    depositar($cnP, $idPablo, '1.00', 'prueba', "deposito $i");
+}
+$cnP->close();
+igual('la cuenta de prueba tiene 45 movimientos y saldo 45.00', '45/45.00', num_movimientos('6666666666') . '/' . saldo('6666666666'));
+
+function filas_tabla($html) {
+    return substr_count($html, '<tr>') - 1; // menos la fila del encabezado
+}
+$pg = function ($p) use ($admin) {
+    return $admin->get('public/movimientos-vista.php?cuenta=6666666666' . ($p === null ? '' : '&p=' . $p))['cuerpo'];
+};
+$h1 = $pg(null);
+igual('pagina 1: 20 filas', 20, filas_tabla($h1));
+comprobar('pagina 1 dice "Pagina 1 de 3 (45 movimientos)"', strpos($h1, 'Página 1 de 3 (45 movimientos)') !== false);
+comprobar('pagina 1 muestra lo mas reciente y no lo mas antiguo', preg_match('/deposito 45\s*<\/td>/', $h1) === 1 && preg_match('/deposito 1\s*<\/td>/', $h1) === 0);
+comprobar('pagina 1 enlaza a la 2 conservando la cuenta', strpos($h1, 'cuenta=6666666666&amp;p=2') !== false);
+comprobar('pagina 1 no tiene enlace a una pagina anterior', strpos($h1, 'Más recientes') === false);
+$h2 = $pg(2);
+igual('pagina 2: 20 filas', 20, filas_tabla($h2));
+comprobar('pagina 2 tiene enlaces a ambos lados', strpos($h2, 'Más recientes') !== false && strpos($h2, 'Más antiguos') !== false);
+$h3 = $pg(3);
+igual('pagina 3: las 5 filas restantes', 5, filas_tabla($h3));
+comprobar('la ultima pagina llega hasta el movimiento mas antiguo', preg_match('/deposito 1\s*<\/td>/', $h3) === 1);
+comprobar('la ultima pagina no tiene enlace a una siguiente', strpos($h3, 'Más antiguos') === false);
+comprobar('pagina fuera de rango cae en la ultima', strpos($pg(999), 'Página 3 de 3') !== false);
+foreach (['abc', '0', '-4'] as $raro) {
+    comprobar("p='$raro' cae en la primera", strpos($pg($raro), 'Página 1 de 3') !== false);
+}
+igual('p como arreglo no rompe la pagina', 200, $admin->get('public/movimientos-vista.php?cuenta=6666666666&p[]=x')['codigo']);
+igual('una cuenta con pocos movimientos no muestra paginacion', 0, substr_count($admin->get('public/movimientos-vista.php?cuenta=2222222222')['cuerpo'], 'Página 1 de'));
+
+$pablo = new Nav();
+$pablo->loginCliente('pablo@test.com', 'Cliente-123');
+$c1 = $pablo->get('public/datos-cliente.php')['cuerpo'];
+igual('cliente pagina 1: 10 filas', 10, filas_tabla($c1));
+comprobar('cliente: "Pagina 1 de 5"', strpos($c1, 'Página 1 de 5') !== false);
+igual('cliente pagina 5: 5 filas', 5, filas_tabla($pablo->get('public/datos-cliente.php?p=5')['cuerpo']));
+comprobar('cliente: pagina fuera de rango cae en la ultima', strpos($pablo->get('public/datos-cliente.php?p=99')['cuerpo'], 'Página 5 de 5') !== false);
+comprobar('cliente: p invalido cae en la primera', strpos($pablo->get('public/datos-cliente.php?p=abc')['cuerpo'], 'Página 1 de 5') !== false);
+comprobar('cliente: "Mas antiguos" lleva a la pagina 2', strpos($c1, 'href="?p=2"') !== false);
+
+// ================================================================== 15. CAMBIO DE CONTRASEÑA DEL CLIENTE
+seccion('15. El cliente cambia su contrasena');
+igual('sin sesion: la pantalla redirige', 302, $anon->get('public/cambiar-clave.php')['codigo']);
+igual('un empleado no entra a la pantalla', 302, $admin->get('public/cambiar-clave.php')['codigo']);
+igual('sin sesion: el endpoint da 403', 403, $anon->pedir('POST', 'src/operations/cambiar-clave-cliente.php', ['actual' => 'x'])['codigo']);
+igual('un empleado no puede usar el endpoint (403)', 403, $admin->post('src/operations/cambiar-clave-cliente.php', ['actual' => 'x', 'nueva' => 'Otra-Clave-1', 'confirmar' => 'Otra-Clave-1'])['codigo']);
+igual('el cliente sin token CSRF da 403', 403, $pablo->pedir('POST', 'src/operations/cambiar-clave-cliente.php', ['actual' => 'Cliente-123', 'nueva' => 'Otra-Clave-1', 'confirmar' => 'Otra-Clave-1'])['codigo']);
+igual('el cliente ve la pantalla', 200, $pablo->get('public/cambiar-clave.php')['codigo']);
+comprobar('"Mi cuenta" enlaza a cambiar la contrasena', strpos($c1, 'cambiar-clave.php') !== false);
+
+function cambiar_clave($nav, $actual, $nueva, $confirmar) {
+    $nav->post('src/operations/cambiar-clave-cliente.php', ['actual' => $actual, 'nueva' => $nueva, 'confirmar' => $confirmar]);
+    return aviso($nav->get('public/cambiar-clave.php')['cuerpo']);
+}
+$hash0 = valor("SELECT contraseña FROM registro WHERE correo = 'pablo@test.com'");
+comprobar('la confirmacion no coincide', strpos(cambiar_clave($pablo, 'Cliente-123', 'Nueva-Clave-2026', 'Otra-Clave-2026'), 'no coincide') !== false);
+comprobar('contrasena nueva muy corta', strpos(cambiar_clave($pablo, 'Cliente-123', 'corta', 'corta'), 'entre 8 y 72') !== false);
+comprobar('contrasena nueva igual a la actual', strpos(cambiar_clave($pablo, 'Cliente-123', 'Cliente-123', 'Cliente-123'), 'distinta') !== false);
+comprobar('contrasena actual incorrecta', strpos(cambiar_clave($pablo, 'incorrecta-1', 'Nueva-Clave-2026', 'Nueva-Clave-2026'), 'no es correcta') !== false);
+igual('con todos esos rechazos la contrasena no cambio', 1, valor("SELECT contraseña = ? FROM registro WHERE correo = 'pablo@test.com'", [$hash0]));
+
+comprobar('cambio correcto', strpos(cambiar_clave($pablo, 'Cliente-123', 'Nueva-Clave-2026', 'Nueva-Clave-2026'), 'actualizada') !== false);
+igual('la sesion sigue abierta tras el cambio', 200, $pablo->get('public/datos-cliente.php')['codigo']);
+igual('el hash guardado es distinto', 0, valor("SELECT contraseña = ? FROM registro WHERE correo = 'pablo@test.com'", [$hash0]));
+comprobar('la nueva contrasena verifica contra el hash guardado', password_verify('Nueva-Clave-2026', valor("SELECT contraseña FROM registro WHERE correo = 'pablo@test.com'")));
+$otro = new Nav();
+comprobar('la contrasena vieja ya no entra', strpos($otro->loginCliente('pablo@test.com', 'Cliente-123')['ubicacion'], 'error=1') !== false);
+comprobar('la contrasena nueva si entra', strpos($otro->loginCliente('pablo@test.com', 'Nueva-Clave-2026')['ubicacion'], 'datos-cliente') !== false);
+
+for ($i = 1; $i <= 5; $i++) {
+    cambiar_clave($pablo, 'incorrecta-' . $i, 'Tercera-Clave-2026', 'Tercera-Clave-2026');
+}
+$msg = cambiar_clave($pablo, 'Nueva-Clave-2026', 'Tercera-Clave-2026', 'Tercera-Clave-2026');
+comprobar('tras 5 intentos fallidos se bloquea, incluso con la actual correcta', strpos($msg, 'Demasiados intentos') !== false, $msg);
+comprobar('...y la contrasena no cambio', password_verify('Nueva-Clave-2026', valor("SELECT contraseña FROM registro WHERE correo = 'pablo@test.com'")));
+
+// ================================================================== 16. PÁGINAS DE ERROR Y FAVICON
+seccion('16. Paginas de error y favicon');
+foreach ([[403, 'Acceso denegado'], [404, 'Página no encontrada'], [500, 'Error del servidor']] as [$cod, $titulo]) {
+    $r = $anon->get("public/error.php?codigo=$cod");
+    igual("error.php?codigo=$cod responde con ese estado", $cod, $r['codigo']);
+    comprobar("...y muestra '$titulo'", strpos($r['cuerpo'], $titulo) !== false);
+}
+igual('sin codigo: 404', 404, $anon->get('public/error.php')['codigo']);
+igual('codigo desconocido: 404', 404, $anon->get('public/error.php?codigo=418')['codigo']);
+$r = $anon->get('public/error.php?codigo=' . urlencode('<script>alert(1)</script>'));
+igual('codigo con HTML: 404', 404, $r['codigo']);
+comprobar('...y no se refleja en la pagina', strpos($r['cuerpo'], '<script>alert') === false);
+$r = $anon->get('public/error.php?codigo=404');
+comprobar('los enlaces son absolutos (funcionan bajo cualquier URL)', strpos($r['cuerpo'], 'href="/public/assets/css/style.css"') !== false && strpos($r['cuerpo'], 'href="/public/index.php"') !== false);
+$favicon = $anon->get('public/assets/images/favicon.svg');
+comprobar('el favicon existe y es un SVG', $favicon['codigo'] === 200 && strpos($favicon['cuerpo'], '<svg') !== false);
+$sin_icono = [];
+foreach (['public/index.php' => $anon, 'public/login-cliente.php' => $anon, 'public/login-empleado.php' => $anon, 'public/error.php' => $anon,
+          'public/regisObusc.php' => $admin, 'public/registro-cliente-vista.php' => $admin, 'public/buscar-cliente-vista.php' => $admin,
+          'public/clientes-vista.php' => $admin, 'public/movimientos-vista.php' => $admin, 'public/auditoria-vista.php' => $admin,
+          'public/empleados-vista.php' => $admin, 'public/sueldos-vista.php' => $admin, 'public/datos-cliente.php' => $pablo,
+          'public/cambiar-clave.php' => $pablo] as $ruta => $nav) {
+    if (strpos($nav->get($ruta)['cuerpo'], 'favicon.svg') === false) {
+        $sin_icono[] = $ruta;
+    }
+}
+comprobar('las 14 paginas enlazan el favicon', count($sin_icono) === 0, implode(', ', $sin_icono));
 
 // ================================================================== resultado
 echo "\n" . str_repeat('=', 60) . "\n";

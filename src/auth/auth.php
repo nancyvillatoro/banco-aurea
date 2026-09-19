@@ -115,6 +115,19 @@ function requerir_empleado_api(): void {
     }
 }
 
+// Endpoints solo para clientes: solo POST, sesión de cliente y token CSRF
+function requerir_cliente_api(): void {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        responder_error(405, 'Método no permitido.');
+    }
+    if (!es_cliente()) {
+        responder_error(403, 'No autorizado.');
+    }
+    if (!csrf_valido()) {
+        responder_error(403, 'Token de seguridad inválido. Recargue la página.');
+    }
+}
+
 // Endpoints solo para el administrador
 function requerir_admin_api(): void {
     requerir_empleado_api();

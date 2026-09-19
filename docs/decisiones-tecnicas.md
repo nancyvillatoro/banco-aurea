@@ -88,6 +88,12 @@ mismo campo. Ahora:
 `password_hash` (bcrypt); `session_regenerate_id` al iniciar sesión (evita fijación de sesión); cookie `HttpOnly` y
 `SameSite=Lax`; expiración a los 30 minutos de inactividad; el hash de la contraseña **no se guarda en la sesión**.
 
+### 3.2b El cliente cambia su contraseña
+Pedir la contraseña **actual** evita que alguien con acceso momentáneo a una sesión abierta cambie la clave y deje al
+dueño fuera. Por eso la actual se verifica contra el hash guardado en la base (en la sesión no hay hash), la nueva debe
+ser distinta y repetirse, y los intentos fallidos usan el mismo bloqueo del login: 5 errores bloquean 5 minutos, incluso
+si el sexto intento trae la contraseña correcta. Tras el cambio se regenera el identificador de sesión.
+
 ### 3.3 Protección contra fuerza bruta
 Tras 5 intentos fallidos para un mismo usuario e IP, el login se bloquea 5 minutos, **incluso con la contraseña
 correcta**. Los mensajes de error son genéricos: no se distingue entre usuario inexistente, contraseña incorrecta o
@@ -102,6 +108,15 @@ pruebas insertan un cliente con `<script>` en el nombre y comprueban que sale es
 `src/config`, `src/lib`, `database` y `tests` tienen un `.htaccess` que impide abrirlos desde el navegador; el hash de
 la contraseña de un cliente no viaja a ninguna página (ni siquiera a la sesión); y en una transferencia el cliente solo
 ve los **últimos 4 dígitos** de la otra cuenta.
+
+## 3b. Historial paginado y páginas de error
+- **Paginación con `LIMIT/OFFSET`:** primero se cuenta el total de movimientos y luego se piden solo los de la página
+  pedida (20 para el empleado, 10 para el cliente). Un número de página inválido (`abc`, `0`, `-4`, `999`) nunca rompe
+  la pantalla: se corrige a la primera o a la última. La página se calcula en el servidor.
+- **Páginas de error propias (403, 404, 500):** Apache las sirve bajo la URL que falló, así que los enlaces no pueden ser
+  relativos (`assets/css/…` se rompería en `/a/b/c`); se construyen desde la ubicación real del archivo. La página no
+  usa sesión ni base de datos, para que funcione aunque eso sea justo lo que falla, y el código de error viene de una
+  lista cerrada, así que nada de lo que escriba el visitante se refleja en la página.
 
 ## 4. Auditoría
 Cada operación de un empleado (login y login fallido, logout, registro de clientes, consultas, depósitos, retiros,
@@ -147,12 +162,13 @@ Cosas que decidí dejar fuera por ser un proyecto académico local (están tambi
 - **La política de contenido usa `'unsafe-inline'`** porque hay scripts dentro del HTML; lo correcto sería moverlos a
   archivos.
 - **Bootstrap 5.0.0-alpha1**, una versión preliminar; habría que pasar a una estable.
-- **Cambiar la contraseña de un empleado no cierra sus sesiones abiertas**; desactivarlo sí.
+- **Cambiar la contraseña de un empleado no cierra sus sesiones abiertas**; desactivarlo sí. Tampoco los empleados pueden
+  cambiar su propia contraseña (solo el administrador).
 - **El bloqueo de login puede usarse para molestar a un usuario** (5 intentos fallidos lo bloquean 5 minutos).
 - **Las pruebas no cubren la apariencia en navegador ni la expiración de sesión.**
-- **El cliente solo consulta**: no cambia su contraseña ni opera. Que un cliente transfiera por sí mismo exigiría
-  confirmar la operación, límites diarios y otra capa de seguridad.
+- **El cliente solo consulta y cambia su contraseña**: no la recupera si la olvida ni opera. Que un cliente transfiera
+  por sí mismo exigiría confirmar la operación, límites diarios y otra capa de seguridad.
 
-Con más tiempo: paginación y filtros en el historial y exportación de estados de cuenta, recuperación de contraseña,
-un rol de administrador con verificación en dos pasos, integración continua para ejecutar las pruebas en cada cambio,
+Con más tiempo: filtros por fecha en el historial y exportación de estados de cuenta, recuperación de contraseña por
+correo, un rol de administrador con verificación en dos pasos, integración continua para ejecutar las pruebas en cada cambio,
 y mover la lógica repetida de los endpoints a un solo lugar.

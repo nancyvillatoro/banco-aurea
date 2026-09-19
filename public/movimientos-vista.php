@@ -11,6 +11,12 @@ $datos = null;       // datos de la cuenta encontrada
 $movimientos = [];
 $error = '';
 
+// Historial paginado: 20 movimientos por página
+$por_pagina = 20;
+$pagina = max(1, (int)($_GET['p'] ?? 1));
+$total = 0;
+$paginas = 1;
+
 if ($cuenta !== '') {
     if (!preg_match('/^\d{10}$/', $cuenta)) {
         $error = 'El número de cuenta debe tener 10 dígitos.';
@@ -26,7 +32,17 @@ if ($cuenta !== '') {
         if (!$datos) {
             $error = 'La cuenta no existe.';
         } else {
-            // Últimos 20 movimientos; revertido_por dice si ya tiene un reverso
+            // Cuántos movimientos tiene la cuenta, para calcular las páginas
+            $stmt = $cn->prepare("SELECT COUNT(*) AS total FROM movimientos WHERE cuenta_id = ?");
+            $stmt->bind_param("i", $datos['id']);
+            $stmt->execute();
+            $total = (int)$stmt->get_result()->fetch_assoc()['total'];
+            $stmt->close();
+            $paginas = max(1, (int)ceil($total / $por_pagina));
+            $pagina = min($pagina, $paginas);
+            $offset = ($pagina - 1) * $por_pagina;
+
+            // Los movimientos de esta página; revertido_por dice si ya tiene un reverso
             $stmt = $cn->prepare("SELECT m.id, m.tipo, m.monto, m.es_credito, m.saldo_despues, m.empleado_id,
                                          m.motivo, m.reversa_de, m.fecha, r.id AS revertido_por,
                                          c.numeroCuenta AS contraparte
@@ -34,13 +50,13 @@ if ($cuenta !== '') {
                                   LEFT JOIN movimientos r ON r.reversa_de = m.id
                                   LEFT JOIN registro c ON c.id = m.contraparte_id
                                   WHERE m.cuenta_id = ?
-                                  ORDER BY m.id DESC LIMIT 20");
-            $stmt->bind_param("i", $datos['id']);
+                                  ORDER BY m.id DESC LIMIT ? OFFSET ?");
+            $stmt->bind_param("iii", $datos['id'], $por_pagina, $offset);
             $stmt->execute();
             $movimientos = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
             $stmt->close();
 
-            registrar_auditoria($cn, 'consultar_movimientos', "Cuenta $cuenta");
+            registrar_auditoria($cn, 'consultar_movimientos', "Cuenta $cuenta, página $pagina");
         }
         $cn->close();
     }
@@ -52,6 +68,11 @@ $token_reverso = $datos ? nuevo_token_operacion() : '';
 $token_transferencia = $datos ? nuevo_token_operacion() : '';
 
 $nombres_tipo = ['apertura' => 'Apertura', 'deposito' => 'Depósito', 'retiro' => 'Retiro', 'reverso' => 'Reverso', 'transferencia' => 'Transferencia'];
+
+// Enlace a otra página del historial, conservando la cuenta
+function enlace_pagina($p, $cuenta) {
+    return '?' . http_build_query(['cuenta' => $cuenta, 'p' => $p]);
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -59,6 +80,7 @@ $nombres_tipo = ['apertura' => 'Apertura', 'deposito' => 'Depósito', 'retiro' =
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Banco Áurea - Movimientos</title>
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
     <link href="assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="assets/css/style.css" rel="stylesheet">
 </head>
@@ -156,7 +178,7 @@ $nombres_tipo = ['apertura' => 'Apertura', 'deposito' => 'Depósito', 'retiro' =
                     </div>
                 </form>
 
-                <h4>Últimos movimientos</h4>
+                <h4>Historial de movimientos</h4>
                 <?php if (count($movimientos) === 0): ?>
                     <div class="alert alert-warning text-center" role="alert">Esta cuenta todavía no tiene movimientos.</div>
                 <?php else: ?>
@@ -215,6 +237,24 @@ $nombres_tipo = ['apertura' => 'Apertura', 'deposito' => 'Depósito', 'retiro' =
                             </tbody>
                         </table>
                     </div>
+
+                    <?php if ($paginas > 1): ?>
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <?php if ($pagina > 1): ?>
+                                <a class="btn btn-outline-primary btn-sm" href="<?php echo esc(enlace_pagina($pagina - 1, $datos['numeroCuenta'])); ?>">&laquo; Más recientes</a>
+                            <?php else: ?>
+                                <span></span>
+                            <?php endif; ?>
+
+                            <span>Página <?php echo $pagina; ?> de <?php echo $paginas; ?> (<?php echo $total; ?> movimientos)</span>
+
+                            <?php if ($pagina < $paginas): ?>
+                                <a class="btn btn-outline-primary btn-sm" href="<?php echo esc(enlace_pagina($pagina + 1, $datos['numeroCuenta'])); ?>">Más antiguos &raquo;</a>
+                            <?php else: ?>
+                                <span></span>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
                 <?php endif; ?>
             <?php endif; ?>
 
