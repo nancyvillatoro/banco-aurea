@@ -749,6 +749,82 @@ $h = $admin->get('public/auditoria-vista.php')['cuerpo'];
 comprobar('el administrador ve la auditoria (ultimas 100 filas)', strpos($h, 'adm_test') !== false && substr_count($h, '<tr>') > 10);
 comprobar('acciones con comillas salen escapadas', strpos($h, "' OR '1'='1") === false);
 
+// ================================================================== 13. DATOS DE DEMOSTRACIÓN
+seccion('13. Datos de demostracion (database/datos-demo.sql)');
+function cargar_sql($ruta) {
+    $sql = preg_replace('/\bbanco\b/', BD_PRUEBA, file_get_contents($ruta));
+    $cn = new mysqli(DB_HOST, DB_USER, DB_PASS);
+    try {
+        $cn->multi_query($sql);
+        do {
+            if ($r = $cn->store_result()) {
+                $r->free();
+            }
+        } while ($cn->more_results() && $cn->next_result());
+    } finally {
+        $cn->close();
+    }
+}
+cargar_sql(RAIZ . '/database/datos-demo.sql');
+igual('se cargaron 3 clientes de demo', 3, valor("SELECT COUNT(*) FROM registro WHERE correo LIKE '%.demo@example.com'"));
+igual('saldo total de las cuentas de demo', '32449.50', valor("SELECT SUM(saldo) FROM registro WHERE correo LIKE '%.demo@example.com'"));
+
+foreach (['7100000001', '7100000002', '7100000003'] as $cta) {
+    $filas = [];
+    $r = bd()->prepare("SELECT m.monto, m.es_credito, m.saldo_despues FROM movimientos m JOIN registro g ON g.id = m.cuenta_id WHERE g.numeroCuenta = ? ORDER BY m.id");
+    $r->bind_param('s', $cta);
+    $r->execute();
+    $filas = $r->get_result()->fetch_all(MYSQLI_ASSOC);
+    $r->close();
+    $corriente = 0.0;
+    $coherente = true;
+    foreach ($filas as $f) {
+        $corriente += $f['es_credito'] ? (float)$f['monto'] : -(float)$f['monto'];
+        if (abs($corriente - (float)$f['saldo_despues']) > 0.001) {
+            $coherente = false;
+        }
+    }
+    comprobar("cuenta $cta: cada saldo_despues sigue al anterior", $coherente && count($filas) > 0);
+    igual("cuenta $cta: el saldo coincide con el ultimo movimiento", number_format($corriente, 2, '.', ''), saldo($cta));
+}
+igual('cada transferencia son 2 filas: una suma y otra resta, mismo monto', 0, valor("SELECT COUNT(*) FROM (SELECT transferencia_ref FROM movimientos WHERE tipo='transferencia' AND transferencia_ref LIKE 'DEMOTRANSF%' GROUP BY transferencia_ref HAVING COUNT(*) <> 2 OR SUM(es_credito) <> 1 OR COUNT(DISTINCT monto) <> 1) x"));
+igual('el reverso apunta a un retiro de la misma cuenta y monto', 1, valor("SELECT COUNT(*) FROM movimientos r JOIN movimientos o ON o.id = r.reversa_de WHERE r.tipo='reverso' AND o.tipo='retiro' AND o.cuenta_id = r.cuenta_id AND o.monto = r.monto AND r.empleado_id = 'demo-admin' AND r.motivo = 'Monto capturado por error'"));
+
+$da = new Nav();
+comprobar('demo-admin / Demo-Admin-2026 entra', strpos($da->loginEmpleado('demo-admin', 'Demo-Admin-2026')['ubicacion'], 'regisObusc') !== false);
+$h = $da->get('public/regisObusc.php')['cuerpo'];
+igual('el administrador de demo ve 7 tarjetas', 7, tarjetas($h));
+comprobar('el panel lo saluda por su nombre', strpos($h, 'Ana Demo (Administradora)') !== false);
+comprobar('la auditoria de demo se ve', strpos($da->get('public/auditoria-vista.php')['cuerpo'], '7100000003') !== false);
+$vista = $da->get('public/movimientos-vista.php?cuenta=7100000003')['cuerpo'];
+comprobar('la cuenta de demo muestra un reverso y una transferencia', strpos($vista, 'Reverso') !== false && strpos($vista, 'Transferencia') !== false);
+
+$de = new Nav();
+comprobar('demo-emp / Demo-Emp-2026 entra', strpos($de->loginEmpleado('demo-emp', 'Demo-Emp-2026')['ubicacion'], 'regisObusc') !== false);
+igual('el empleado de demo ve 5 tarjetas', 5, tarjetas($de->get('public/regisObusc.php')['cuerpo']));
+$nom = json_decode($de->post('src/operations/calcular-sueldo.php', ['empleado_id' => 1])['cuerpo'], true);
+comprobar('la nomina de demo funciona (empleado 1: 18,000 + 2,500)', ($nom['status'] ?? '') === 'success' && ($nom['total'] ?? '') === '20,500.00', json_encode($nom));
+
+foreach (['lucia.demo@example.com', 'diego.demo@example.com', 'sol.demo@example.com'] as $correo) {
+    $dc = new Nav();
+    comprobar("cliente $correo / Demo-Cliente-2026 entra", strpos($dc->loginCliente($correo, 'Demo-Cliente-2026')['ubicacion'], 'datos-cliente') !== false);
+}
+$dc = new Nav();
+$dc->loginCliente('lucia.demo@example.com', 'Demo-Cliente-2026');
+$h = $dc->get('public/datos-cliente.php')['cuerpo'];
+comprobar('Lucia ve su saldo de 7,700.00', strpos($h, '7,700.00') !== false);
+comprobar('Lucia ve transferencias con la otra cuenta enmascarada', strpos($h, 'Transferencia') !== false && strpos($h, '******') !== false);
+
+$antes = (int)valor("SELECT COUNT(*) FROM movimientos");
+$fallo_esperado = false;
+try {
+    cargar_sql(RAIZ . '/database/datos-demo.sql');
+} catch (mysqli_sql_exception $e) {
+    $fallo_esperado = true; // correo repetido: el script se detiene
+}
+comprobar('cargar la demo por segunda vez falla en vez de duplicar', $fallo_esperado);
+igual('...y no se duplico ningun movimiento', $antes, (int)valor("SELECT COUNT(*) FROM movimientos"));
+
 // ================================================================== resultado
 echo "\n" . str_repeat('=', 60) . "\n";
 if ($fallos) {
