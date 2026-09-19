@@ -7,9 +7,9 @@ requerir_empleado_vista();
 <html lang="es">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Panel de Control - Banco Áurea</title>
     <link href="assets/css/bootstrap.min.css" rel="stylesheet">
-    <link href="assets/css/font-awesome.min.css" rel="stylesheet">
     <link href="assets/css/style.css" rel="stylesheet">
 </head>
 <body style="background: #f8f9fa;">
@@ -21,21 +21,30 @@ requerir_empleado_vista();
             </div>
             
             <div class="row text-center">
-                <div class="col-md-6 mb-3">
+                <div class="col-md-4 mb-3">
                     <div class="p-4 border rounded bg-white h-100">
-                        <div style="font-size: 3rem;">👤➕</div>
+                        <div style="font-size: 3rem;" aria-hidden="true">👤➕</div>
                         <h3>Registrar Cliente</h3>
                         <p>Dar de alta nuevas cuentas en el sistema.</p>
                         <a href="registro-cliente-vista.php" class="btn btn-success btn-lg btn-block">Ir a Registro</a>
                     </div>
                 </div>
 
-                <div class="col-md-6 mb-3">
+                <div class="col-md-4 mb-3">
                     <div class="p-4 border rounded bg-white h-100">
-                        <div style="font-size: 3rem;">🔍</div>
+                        <div style="font-size: 3rem;" aria-hidden="true">🔍</div>
                         <h3>Consultar Cuentas</h3>
                         <p>Ver saldos, movimientos y datos de clientes.</p>
                         <a href="buscar-cliente-vista.php" class="btn btn-primary btn-lg btn-block">Ir a Buscador</a>
+                    </div>
+                </div>
+
+                <div class="col-md-4 mb-3">
+                    <div class="p-4 border rounded bg-white h-100">
+                        <div style="font-size: 3rem;" aria-hidden="true">💵</div>
+                        <h3>Nómina</h3>
+                        <p>Consultar el sueldo de un empleado.</p>
+                        <a href="sueldos-vista.php" class="btn btn-info btn-lg btn-block">Ir a Nómina</a>
                     </div>
                 </div>
             </div>

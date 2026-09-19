@@ -7,6 +7,7 @@ requerir_empleado_vista();
 <html lang="es">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Banco Áurea - Consulta de Cuentas</title>
     <link href="assets/css/bootstrap.min.css" rel="stylesheet">
     <link href="assets/css/style.css" rel="stylesheet">
@@ -15,22 +16,21 @@ requerir_empleado_vista();
     <div class="container mt-5">
         <div class="form-03-main card p-4">
             <div class="text-center mb-4">
-                <img src="assets/images/user.png" class="logo" style="width:60px; height:60px; margin: 0 auto 10px;">
+                <img src="assets/images/user.png" class="logo" alt="Logo de Banco Áurea" style="width:60px; height:60px; margin: 0 auto 10px;">
                 <h2>Consulta de Clientes</h2>
             </div>
 
             <div class="row justify-content-center mb-4">
                 <div class="col-md-8">
                     <div class="input-group">
-                        <input type="text" id="num_cuenta" class="form-control" placeholder="Ingrese el Número de Cuenta (10 dígitos)">
-                        <div class="input-group-append">
-                            <button class="btn btn-primary" type="button" id="btnBuscar">Buscar Cliente</button>
-                        </div>
+                        <label for="num_cuenta" class="sr-only">Número de cuenta</label>
+                        <input type="text" id="num_cuenta" class="form-control" inputmode="numeric" maxlength="10" placeholder="Ingrese el Número de Cuenta (10 dígitos)">
+                        <button class="btn btn-primary" type="button" id="btnBuscar">Buscar Cliente</button>
                     </div>
                 </div>
             </div>
 
-            <div id="resultado-busqueda" style="display:none;">
+            <div id="resultado-busqueda" style="display:none;" aria-live="polite">
                 <hr>
                 <div class="row">
                     <div class="col-md-6">
@@ -46,7 +46,7 @@ requerir_empleado_vista();
                 </div>
             </div>
 
-            <div id="error-busqueda" class="alert alert-danger mt-3" style="display:none;"></div>
+            <div id="error-busqueda" class="alert alert-danger mt-3" role="alert" style="display:none;"></div>
 
             <div class="text-center mt-4">
                 <a href="regisObusc.php" class="btn btn-secondary">Volver al Panel</a>

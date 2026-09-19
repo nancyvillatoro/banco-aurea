@@ -1,66 +1,78 @@
-/* Importaciones */
-@import url(https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700);
-@import url(https://fonts.googleapis.com/css?family=Arimo:300,400,400italic,700,700italic);
+/* Banco Áurea — estilos propios (se cargan después de bootstrap.min.css) */
 
-* {
-  margin: 0;
-  padding: 0;
-  list-style: none; 
+:root {
+  --aurea-azul: #2b3990;
+  --aurea-celeste: #2d7ac6;
+  --aurea-titulo: #003366;
+  --aurea-error: #b00020;
+  --aurea-degradado: linear-gradient(to right, rgba(0, 20, 40, 1), rgba(0, 162, 255, 1));
+  --fuente-titulo: Constantia, Georgia, "Times New Roman", serif;
 }
 
 body {
-  font-family: "Open Sans";
-  height: 100vh;
-  overflow: hidden; 
-  background: url(../images/Fondo.jpg) no-repeat center center fixed;
+  min-height: 100vh;
+  font-family: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: #f4f6f9 url(../images/Fondo.jpg) no-repeat center center fixed;
   background-size: cover;
 }
 
 img {
-  max-width: 100%; 
+  max-width: 100%;
 }
 
 a {
   text-decoration: none;
-  outline: none;
-  color: #444; 
+  color: #444;
 }
 
 a:hover {
-  color: #444; 
+  color: #444;
 }
 
+/* Accesibilidad: foco visible en todo elemento interactivo */
+a:focus-visible,
+button:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible {
+  outline: 3px solid #ffbf47;
+  outline-offset: 2px;
+}
+
+/* Pantalla centrada (inicio y logins) */
 .form-02-main {
-  position: relative;
-  z-index: 2;
-  height: 100vh; 
-}
-
-._lk_de {
-  padding: 40px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 16px;
 }
 
 .form-03-main {
   border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   padding: 30px;
-  background: rgba(255, 255, 255, 0.177);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.form-login {
+  width: 100%;
+  max-width: 450px;
 }
 
 .form-03-main h1 {
-  font-family: 'Constantia';
-  font-size: 3.6rem;
-  font-weight: 900; 
-  color: #003366;
+  font-family: var(--fuente-titulo);
+  font-size: clamp(2rem, 8vw, 3.6rem);
+  font-weight: 900;
+  color: var(--aurea-titulo);
   text-align: center;
   margin-bottom: 20px;
 }
 
 .form-03-main p {
-  font-family: 'Constantia';
+  font-family: var(--fuente-titulo);
   font-size: 1.1rem;
   font-weight: 500;
-  color: #4D4D4D;
+  color: #4d4d4d;
   text-align: center;
   margin-bottom: 0;
   line-height: 1.6;
@@ -74,254 +86,114 @@ a:hover {
 }
 
 .logo-text {
-  font-family: 'Constantia', serif;
+  font-family: var(--fuente-titulo);
   font-size: 1rem;
   font-weight: 700;
-  background: linear-gradient(to right, rgba(0, 20, 40, 1), rgba(0, 162, 255, 1));
+  background: var(--aurea-degradado);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .form-group {
-  padding: 20px 0;
-}
-
-.d-flex {
-  display: flex;
-  justify-content: space-between;
+  padding: 12px 0;
 }
 
 .form-control {
   min-height: 45px;
   padding: 10px 15px;
   border-radius: 20px;
-  border: 1px solid #2b3990;
-  background: rgba(255, 255, 255, 0.019);
+  border: 1px solid var(--aurea-azul);
+  background: rgba(255, 255, 255, 0.7);
   transition: background-color 0.3s, border-color 0.3s;
 }
 
 .form-control:focus {
-  background: rgba(255, 255, 255, 0.5);
-  border-color: #2b3990;
-  outline: none;
+  background: #fff;
+  border-color: var(--aurea-azul);
+  box-shadow: 0 0 0 0.2rem rgba(43, 57, 144, 0.25);
+}
+
+/* Botones */
+.btn_cliente,
+.btn_emp,
+.btn_sesionC,
+.btn_sesionE,
+.btn_Registro {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  color: #fff;
+  text-align: center;
+  border: none;
+  border-radius: 20px;
+  font-size: 16px;
+  transition: background-color 0.3s, transform 0.2s;
+  cursor: pointer;
 }
 
 .btn_cliente {
-  width: 100%;
-  padding: 12px;
-  background-color: #2b3990; 
-  color: white; 
-  border: none; 
-  border-radius: 20px; 
-  font-size: 16px;
-  transition: background-color 0.3s, transform 0.2s; 
-  cursor: pointer; 
+  background-color: var(--aurea-azul);
 }
 
-.btn_cliente:hover {
-  background-color: #2b3990d4;
+.btn_emp,
+.btn_sesionC,
+.btn_sesionE,
+.btn_Registro {
+  background-color: var(--aurea-celeste);
 }
 
-.btn_emp, .btn_sesionC, .btn_sesionE, .btn_Registro {
-  width: 100%;
-  padding: 12px;
-  background-color:  #2d7ac6; 
-  color: white; 
-  border: none; 
-  border-radius: 20px; 
-  font-size: 16px;
-  transition: background-color 0.3s, transform 0.2s; 
-  cursor: pointer; 
+.btn_cliente:hover,
+.btn_emp:hover,
+.btn_sesionC:hover,
+.btn_sesionE:hover,
+.btn_Registro:hover {
+  color: #fff;
+  filter: brightness(0.88);
 }
 
-.btn_emp:hover, .btn_sesionC:hover, .btn_sesionE:hover, .btn_Registro:hover {
-  background-color: #2d79c6b5;
-  transform: scale(1.05);
+.btn_emp:hover,
+.btn_sesionC:hover,
+.btn_sesionE:hover,
+.btn_Registro:hover {
+  transform: scale(1.03);
 }
 
+.btn-salir {
+  display: inline-block;
+  padding: 10px 15px;
+  color: #fff;
+  background: var(--aurea-degradado);
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  text-align: center;
+  cursor: pointer;
+}
 
+.btn-salir:hover {
+  color: #fff;
+  filter: brightness(0.8);
+}
 
 .link_register {
-  color: #007bff; 
+  color: #0056b3;
   text-decoration: underline;
 }
 
 .link_register:hover {
-  color: #2d34ff; 
+  color: #003d80;
 }
 
-._social_04 {
-  text-align: center; 
+/* Datos del cliente */
+.card-body p strong,
+.datos-cuenta p strong {
+  color: #140062;
 }
 
-._social_04 ol {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  gap: 10px;
-  justify-content: center; 
+.datos-cuenta p {
+  font-family: inherit;
+  text-align: left;
+  color: #333;
+  margin-bottom: 10px;
 }
-
-._social_04 ol li {
-  display: inline-block;
-  width: 40px;
-  height: 40px;
-  text-align: center;
-  line-height: 40px;
-  background: #ffffff50;
-  border-radius: 50px;
-  border: 1px solid #2b3990;
-  margin: 0 10px;
-  transition: transform 0.3s, background 0.3s, border-color 0.3s;
-}
-
-._social_04 ol li:hover {
-  transform: scale(1.2);
-  background: #ffffff; 
-  border-color: #2b3990;
-}
-
-._social_04 ol li a {
-  font-size: 1.5rem; 
-  transition: color 0.3s; 
-}
-
-._social_04 ol li a .fa-facebook {
-  color: #3b5998; 
-}
-
-._social_04 ol li a .fa-twitter {
-  color: #1da1f2; 
-}
-
-._social_04 ol li a .fa-google-plus {
-  color: #db4437; 
-}
-
-._social_04 ol li a .fa-instagram {
-  color: #e1306c; 
-}
-
-._social_04 ol li a .fa-linkedin {
-  color: #0077b5; 
-}
-
-._social_04 ol li a:hover .fa-facebook {
-  color: #3b5998; 
-}
-
-._social_04 ol li a:hover .fa-twitter {
-  color: #1da1f2; 
-}
-
-._social_04 ol li a:hover .fa-google-plus {
-  color: #db4437; 
-}
-
-._social_04 ol li a:hover .fa-instagram {
-  color: #e1306c; 
-}
-
-._social_04 ol li a:hover .fa-linkedin {
-  color: #0077b5; 
-}
-
-
-
-@media screen and (max-width: 600px) {
-  .form-03-main {
-    width: 100%;
-  }
-}
-
-
-
-
-
-
-
-
-
-        body {
-            background-color: #f4f6f9;
-            font-family: Arial, sans-serif;
-        }
-        .container {
-            margin-top: 50px;
-        }
-        .card {
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            padding: 30px;
-            background: rgba(255, 255, 255, 0.177);
-        }
-        .card-header {
-            background: linear-gradient(to right, rgba(0, 20, 40, 1), rgba(0, 162, 255, 1));
-            color: #ffffff;
-            padding: 5px;
-            border-radius: 8px 8px 0 0;
-            font-size: 1.25rem;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .card-body p {
-            font-size: 1rem;
-            font-weight: 400;
-            color: #333;
-            margin-bottom: 10px;
-        }
-        .card-body p strong {
-            color:  #140062;
-        }
-        .btn-salir {
-            display: inline-block;
-            background: linear-gradient(to right, rgba(0, 20, 40, 1), rgba(0, 162, 255, 1));
-            color: white; 
-            border: none;
-            padding: 10px 15px; 
-            border-radius: 4px; 
-            font-size: 1rem; 
-            text-decoration: none; 
-            text-align: center;
-            margin-top: 10px;
-            float: right;
-        }
-
-        .btn-salir:hover {
-            background-color: #413b3c; 
-        }
-
-        .btn-buscar {
-          display: inline-block;
-          background: linear-gradient(to right, rgba(0, 20, 40, 1), rgba(0, 162, 255, 1));
-          color: white; 
-          border: none;
-          padding: 10px 15px; 
-          border-radius: 4px; 
-          font-size: 1rem; 
-          text-decoration: none; 
-          text-align: center;
-          margin-top: 10px;
-          
-      }
-
-
-        
-        .logo {
-            display: block;
-            margin: 0 auto; 
-            width: 100px;
-            height: 100px;
-            margin-bottom: 30px;
-            }
-
-            .logo-text {
-            font-family: 'Constantia', serif;
-            font-size: 1rem;
-            font-weight: 700;
-            background: linear-gradient(to right, rgba(0, 20, 40, 1), rgba(0, 162, 255, 1));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            }
