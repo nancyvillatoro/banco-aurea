@@ -2,6 +2,7 @@
 require_once '../auth/auth.php';
 requerir_empleado_api();
 require_once '../config/db.php';
+require_once '../auth/auditoria.php';
 
 const TIPOS_CUENTA = ['Ahorro', 'Nomina', 'Empresarial'];
 const VISTA_REGISTRO = '../../public/registro-cliente-vista.php';
@@ -102,6 +103,7 @@ try {
     volver_con_error('Error en el sistema. Inténtelo de nuevo.', $old);
 }
 $stmt->close();
+registrar_auditoria($cn, 'registrar_cliente', "Cuenta $cuenta, correo $correo");
 $cn->close();
 
 flash_set('success', "Cliente registrado correctamente (cuenta $cuenta).");

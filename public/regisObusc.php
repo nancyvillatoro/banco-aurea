@@ -21,7 +21,7 @@ requerir_empleado_vista();
             </div>
             
             <div class="row text-center">
-                <div class="col-md-4 mb-3">
+                <div class="col-md-6 col-lg-4 mb-3">
                     <div class="p-4 border rounded bg-white h-100">
                         <div style="font-size: 3rem;" aria-hidden="true">👤➕</div>
                         <h3>Registrar Cliente</h3>
@@ -30,7 +30,7 @@ requerir_empleado_vista();
                     </div>
                 </div>
 
-                <div class="col-md-4 mb-3">
+                <div class="col-md-6 col-lg-4 mb-3">
                     <div class="p-4 border rounded bg-white h-100">
                         <div style="font-size: 3rem;" aria-hidden="true">🔍</div>
                         <h3>Consultar Cuentas</h3>
@@ -39,12 +39,30 @@ requerir_empleado_vista();
                     </div>
                 </div>
 
-                <div class="col-md-4 mb-3">
+                <div class="col-md-6 col-lg-4 mb-3">
                     <div class="p-4 border rounded bg-white h-100">
                         <div style="font-size: 3rem;" aria-hidden="true">💵</div>
                         <h3>Nómina</h3>
                         <p>Consultar el sueldo de un empleado.</p>
                         <a href="sueldos-vista.php" class="btn btn-info btn-lg btn-block">Ir a Nómina</a>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="p-4 border rounded bg-white h-100">
+                        <div style="font-size: 3rem;" aria-hidden="true">📋</div>
+                        <h3>Clientes</h3>
+                        <p>Listado de clientes con búsqueda.</p>
+                        <a href="clientes-vista.php" class="btn btn-secondary btn-lg btn-block">Ver Clientes</a>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="p-4 border rounded bg-white h-100">
+                        <div style="font-size: 3rem;" aria-hidden="true">🕵️</div>
+                        <h3>Auditoría</h3>
+                        <p>Ver qué operaciones se han realizado.</p>
+                        <a href="auditoria-vista.php" class="btn btn-dark btn-lg btn-block">Ver Auditoría</a>
                     </div>
                 </div>
             </div>

@@ -2,6 +2,7 @@
 require_once '../auth/auth.php';
 requerir_empleado_api();
 require_once '../config/db.php';
+require_once '../auth/auditoria.php';
 $cn = getConexion();
 
 if (isset($_POST['empleado_id']) && ctype_digit((string)$_POST['empleado_id'])) {
@@ -17,6 +18,8 @@ if (isset($_POST['empleado_id']) && ctype_digit((string)$_POST['empleado_id'])) 
         error_log("calcular-sueldo: " . $e->getMessage());
         responder_error(500, "No se pudo consultar la nómina.");
     }
+
+    registrar_auditoria($cn, 'consultar_nomina', "Empleado ID $id");
 
     if ($f) {
         $total = $f['sueldo_base'] + $f['bono'];

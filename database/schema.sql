@@ -54,5 +54,17 @@ CREATE TABLE IF NOT EXISTS sueldo (
   PRIMARY KEY (empleado_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- Auditoría: registra qué empleado hizo cada operación
+CREATE TABLE IF NOT EXISTS auditoria (
+  id          INT(11)      NOT NULL AUTO_INCREMENT,
+  empleado_id VARCHAR(50)  NOT NULL,             -- id_e del empleado (o el ID intentado en un login fallido)
+  accion      VARCHAR(50)  NOT NULL,             -- login, logout, registrar_cliente, consultar_cuenta...
+  detalle     VARCHAR(255) DEFAULT NULL,
+  ip          VARCHAR(45)  DEFAULT NULL,
+  fecha       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_fecha (fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 -- Crear un empleado (generar el hash con:  php -r "echo password_hash('TuClave', PASSWORD_DEFAULT);" )
 -- INSERT INTO inicioe (id_e, `contraseña`) VALUES ('admin', '<hash>');

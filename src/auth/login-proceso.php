@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/auditoria.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -36,10 +37,12 @@ if (isset($_POST['ID'])) {
         $_SESSION['nombre'] = "Administrador";
         $_SESSION['rol'] = "empleado";
         $_SESSION['empleado_id'] = $emp['id_e'];
+        registrar_auditoria($cn, 'login');
         header("Location: ../../public/regisObusc.php");
         exit();
     }
     login_fallo($usuario);
+    registrar_auditoria($cn, 'login_fallido', 'ID intentado: ' . $usuario, mb_substr($usuario, 0, 50));
     header("Location: ../../public/login-empleado.php?error=1");
     exit();
 
