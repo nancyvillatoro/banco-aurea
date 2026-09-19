@@ -65,6 +65,15 @@ requerir_empleado_vista();
                         <a href="auditoria-vista.php" class="btn btn-dark btn-lg btn-block">Ver Auditoría</a>
                     </div>
                 </div>
+
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="p-4 border rounded bg-white h-100">
+                        <div style="font-size: 3rem;" aria-hidden="true">💰</div>
+                        <h3>Movimientos</h3>
+                        <p>Depósitos, retiros e historial de una cuenta.</p>
+                        <a href="movimientos-vista.php" class="btn btn-warning btn-lg btn-block">Ir a Movimientos</a>
+                    </div>
+                </div>
             </div>
 
             <div class="text-center mt-4">

@@ -12,7 +12,23 @@ $stmt->bind_param("i", $id);
 $stmt->execute();
 $c = $stmt->get_result()->fetch_assoc();
 $stmt->close();
+
+// Últimos 10 movimientos de SU cuenta (el id sale de la sesión, no de la URL)
+$movimientos = [];
+if ($c) {
+    try {
+        $stmt = $cn->prepare("SELECT tipo, monto, es_credito, saldo_despues, motivo, fecha
+                              FROM movimientos WHERE cuenta_id = ? ORDER BY id DESC LIMIT 10");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $movimientos = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+    } catch (mysqli_sql_exception $e) {
+        error_log("datos-cliente: " . $e->getMessage());
+    }
+}
 $cn->close();
+$nombres_tipo = ['apertura' => 'Apertura', 'deposito' => 'Depósito', 'retiro' => 'Retiro', 'reverso' => 'Corrección'];
 
 // Si la cuenta ya no existe, se manda al login
 if (!$c) {
@@ -39,6 +55,32 @@ if (!$c) {
                 <p><strong>Saldo Actual:</strong> $<?php echo number_format((float)$c['saldo'], 2); ?></p>
                 <p><strong>Sucursal:</strong> <?php echo esc($c['sucursal2']); ?></p>
             </div>
+
+            <h3 class="mt-4">Últimos movimientos</h3>
+            <?php if (count($movimientos) === 0): ?>
+                <p class="text-muted">Todavía no tiene movimientos.</p>
+            <?php else: ?>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Saldo</th><th>Detalle</th></tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($movimientos as $m): ?>
+                                <tr>
+                                    <td><?php echo esc($m['fecha']); ?></td>
+                                    <td><?php echo esc($nombres_tipo[$m['tipo']] ?? $m['tipo']); ?></td>
+                                    <td class="<?php echo $m['es_credito'] ? 'text-success' : 'text-danger'; ?>">
+                                        <?php echo $m['es_credito'] ? '+' : '-'; ?>$<?php echo number_format((float)$m['monto'], 2); ?>
+                                    </td>
+                                    <td>$<?php echo number_format((float)$m['saldo_despues'], 2); ?></td>
+                                    <td><?php echo esc($m['motivo']); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
             <form action="../src/auth/logout.php" method="post" class="text-right mt-4">
                 <?php echo csrf_field(); ?>
                 <button type="submit" class="btn-salir">Cerrar Sesión</button>

@@ -66,5 +66,25 @@ CREATE TABLE IF NOT EXISTS auditoria (
   KEY idx_fecha (fecha)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- Movimientos de dinero de cada cuenta.
+-- Nunca se editan ni se borran: un error se corrige con otro movimiento de tipo 'reverso'.
+CREATE TABLE IF NOT EXISTS movimientos (
+  id            INT(11)       NOT NULL AUTO_INCREMENT,
+  cuenta_id     INT(11)       NOT NULL,                 -- registro.id
+  tipo          ENUM('apertura','deposito','retiro','reverso') NOT NULL,
+  monto         DECIMAL(10,2) NOT NULL,                 -- siempre positivo
+  es_credito    TINYINT(1)    NOT NULL,                 -- 1 = suma al saldo, 0 = resta
+  saldo_despues DECIMAL(10,2) NOT NULL,                 -- saldo de la cuenta luego del movimiento
+  empleado_id   VARCHAR(50)   NOT NULL,                 -- quién lo hizo ('sistema' en las aperturas migradas)
+  motivo        VARCHAR(255)  DEFAULT NULL,
+  reversa_de    INT(11)       DEFAULT NULL,             -- si es un reverso, id del movimiento que corrige
+  fecha         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_reversa_de (reversa_de),                -- un movimiento solo se puede revertir una vez
+  KEY idx_cuenta (cuenta_id, id),
+  CONSTRAINT fk_mov_cuenta FOREIGN KEY (cuenta_id) REFERENCES registro (id),
+  CONSTRAINT fk_mov_reversa FOREIGN KEY (reversa_de) REFERENCES movimientos (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 -- Crear un empleado (generar el hash con:  php -r "echo password_hash('TuClave', PASSWORD_DEFAULT);" )
 -- INSERT INTO inicioe (id_e, `contraseña`) VALUES ('admin', '<hash>');

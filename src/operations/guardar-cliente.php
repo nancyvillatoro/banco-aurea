@@ -93,9 +93,23 @@ $sql = "INSERT INTO registro (nombre, correo, contraseña, nacimiento, numeroCue
 $stmt = $cn->prepare($sql);
 $stmt->bind_param("ssssssdss", $nombre, $correo, $hash, $fechaNac, $cuenta, $tipo, $saldo, $hoy, $sucursal);
 
+$cn->begin_transaction();
 try {
     $stmt->execute();
+    $cuenta_id = $cn->insert_id;
+
+    // El saldo inicial también queda como el primer movimiento de la cuenta
+    if ($saldo > 0) {
+        $empleado = $_SESSION['empleado_id'] ?? '';
+        $mov = $cn->prepare("INSERT INTO movimientos (cuenta_id, tipo, monto, es_credito, saldo_despues, empleado_id, motivo)
+                             VALUES (?, 'apertura', ?, 1, ?, ?, 'Saldo inicial')");
+        $mov->bind_param("idds", $cuenta_id, $saldo, $saldo, $empleado);
+        $mov->execute();
+        $mov->close();
+    }
+    $cn->commit();
 } catch (mysqli_sql_exception $e) {
+    $cn->rollback();
     if ($e->getCode() === 1062) { // clave duplicada (carrera entre el SELECT y el INSERT)
         volver_con_error('El correo o el número de cuenta ya está registrado.', $old);
     }

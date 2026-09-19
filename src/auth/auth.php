@@ -98,6 +98,27 @@ function csrf_valido(): bool {
         && hash_equals($_SESSION['csrf_token'] ?? '', $enviado);
 }
 
+// ---- Token de operación (un solo uso) ----
+// Evita que un formulario de dinero se procese dos veces (doble clic, recargar la página).
+function nuevo_token_operacion(): string {
+    $t = bin2hex(random_bytes(16));
+    $_SESSION['op_tokens'][$t] = time();
+    // Guardamos solo los últimos 20 para que la sesión no crezca
+    if (count($_SESSION['op_tokens']) > 20) {
+        array_shift($_SESSION['op_tokens']);
+    }
+    return $t;
+}
+
+// Devuelve true solo la primera vez que se usa un token válido
+function usar_token_operacion($token): bool {
+    if (is_string($token) && isset($_SESSION['op_tokens'][$token])) {
+        unset($_SESSION['op_tokens'][$token]);
+        return true;
+    }
+    return false;
+}
+
 // ---- Límite de intentos de login (por IP + usuario) ----
 const LOGIN_MAX_INTENTOS = 5;
 const LOGIN_BLOQUEO_SEG  = 300;
