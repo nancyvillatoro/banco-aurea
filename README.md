@@ -4,19 +4,6 @@ Aplicación web bancaria hecha en **PHP y MySQL** como proyecto académico: clie
 empleados que operan el dinero (depósitos, retiros y transferencias) con control de roles, auditoría y pruebas
 automáticas de extremo a extremo.
 
-El foco del proyecto no es el diseño visual sino hacer bien lo que en un sistema con dinero **no puede fallar**:
-saldos que siempre cuadran, operaciones que se hacen completas o no se hacen, permisos que se verifican en el
-servidor y un historial que nunca se reescribe. Las decisiones y sus razones están en
-[docs/decisiones-tecnicas.md](docs/decisiones-tecnicas.md).
-
-<!--
-Capturas de pantalla (agregar en docs/capturas/ y quitar este comentario):
-![Inicio de sesión](docs/capturas/login.png)
-![Panel del administrador](docs/capturas/panel-admin.png)
-![Movimientos de una cuenta](docs/capturas/movimientos.png)
-![Mi cuenta (cliente)](docs/capturas/mi-cuenta.png)
--->
-
 ## Qué puede hacer cada rol
 
 | Rol | Puede |
@@ -25,39 +12,11 @@ Capturas de pantalla (agregar en docs/capturas/ y quitar este comentario):
 | **Empleado** | Registrar clientes, buscar cuentas, listar clientes con búsqueda y paginación, consultar nómina, hacer depósitos, retiros y transferencias, y ver el historial paginado de una cuenta. |
 | **Administrador** | Todo lo del empleado, más: **revertir movimientos** (incluidas transferencias completas), ver la **auditoría** y **gestionar empleados** (crear, cambiar contraseña y rol, activar o desactivar). |
 
-## Probarlo en 5 minutos
-
-Requisitos: [XAMPP](https://www.apachefriends.org/) (Apache + MariaDB/MySQL, PHP 8.1 o superior).
-
-1. Copiar el proyecto en `C:\xampp\htdocs\bancoAurea` y arrancar **Apache** y **MySQL** desde el panel de XAMPP.
-2. Crear la base de datos y cargar los datos de demostración:
-   ```
-   C:\xampp\mysql\bin\mysql.exe -u root < database\schema.sql
-   C:\xampp\mysql\bin\mysql.exe -u root < database\datos-demo.sql
-   ```
-   Esto crea (o usa) una base llamada `banco`. Los datos de demo son ficticios y solo deben cargarse una vez.
-3. Abrir `http://localhost/bancoAurea/public/`.
-
-### Credenciales de demostración
-
-| Rol | Usuario | Contraseña |
-|---|---|---|
-| Administrador | ID `demo-admin` | `Demo-Admin-2026` |
-| Empleado | ID `demo-emp` | `Demo-Emp-2026` |
-| Cliente | `lucia.demo@example.com` (también `diego.demo@…` y `sol.demo@…`) | `Demo-Cliente-2026` |
-
-Los empleados entran por **"Soy Empleado"** y los clientes por **"Soy Cliente"**. La demo incluye depósitos, retiros,
-dos transferencias entre cuentas y un reverso, con saldos que cuadran con sus movimientos. Los saldos y montos son
-ficticios. En **Nómina** se puede consultar el número de empleado `1` o `2`.
-
-Si quieres usar tus propias credenciales de MySQL, copia `src/config/config.example.php` a
-`src/config/config.local.php` (ese archivo no se versiona).
-
 ## Tecnologías
 
 - **PHP 8.2** sin framework (mysqli con sentencias preparadas), **MariaDB/MySQL** (InnoDB), **Apache**.
 - **Bootstrap 5** (versión `5.0.0-alpha1`) y jQuery para la interfaz.
-- Sin dependencias externas de PHP: no hace falta Composer.
+- Sin dependencias externas de PHP
 
 ## Lo más importante que resuelve
 
@@ -86,24 +45,6 @@ escape de toda salida HTML · endpoints que solo aceptan POST y responden 403 si
 seguridad, páginas de error propias (403, 404 y 500) y bloqueo de acceso directo a `src/config`, `src/lib`,
 `database` y `tests` mediante `.htaccess`.
 
-## Pruebas automáticas
-
-```
-C:\xampp\php\php.exe tests\run-tests.php
-```
-
-**327 comprobaciones de extremo a extremo.** El script crea una base temporal `banco_test` desde
-`database/schema.sql`, levanta un servidor PHP propio en el puerto 8081, recorre la aplicación con peticiones HTTP
-reales y al terminar borra la base y apaga el servidor. **No toca la base de datos real** (aborta si la base
-configurada no es `banco_test`). Termina con código 0 si todo pasó.
-
-Cubre: login y bloqueo por intentos, roles y permisos, registro con validaciones, búsquedas, depósitos, retiros y
-transferencias (montos inválidos, límites, doble envío), reversos, retiros y transferencias simultáneas, rollback,
-gestión de empleados con la sesión abierta, vista del cliente, paginación del historial, cambio de contraseña, páginas
-de error, logout, auditoría y los propios datos de demostración (incluye que las credenciales documentadas funcionan).
-
-Necesita MySQL encendido. Algunos antivirus bloquean estos archivos (levantan un servidor y terminan procesos):
-agregue una excepción para la carpeta `tests/` si le pasa.
 
 ## Estructura
 
